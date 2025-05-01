@@ -1,3 +1,6 @@
+# This script is used to install the packages listed in the requirements.txt file
+# We need rust for some of the packages. Install it from https://rustup.rs/ and then run
+# set PATH=%PATH%;C:\Users\%USERNAME%\.cargo\bin before we install all the required packages.
 import subprocess
 import sys
 import time
