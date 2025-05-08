@@ -7,6 +7,7 @@ import pandas as pd
 from openai import OpenAI
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import argparse
+import csv
 
 def read_jsonl(filename):
     """Read jsonl files and return list of dictionaries."""
@@ -20,13 +21,23 @@ def read_jsonl(filename):
     return data
 
 def extract_context(prompt):
-    """Extract just the problem context from the prompt."""
+    """Extract just the problem context from the prompt, without code snippets."""
+    # Split at "Given the following output/input:"
     parts = re.split(r"Given the following (output|input):", prompt)
     if len(parts) > 1:
         raw_context = parts[0]
+        
+        # Remove template beginning
         template_start = "You are given a question that requires some input and output variables as follows:\n\n"
         if raw_context.startswith(template_start):
             raw_context = raw_context[len(template_start):]
+        
+        # Remove any reference code section by looking for the marker
+        code_marker = "Tip: Here is a reference code snippet for this question."
+        if code_marker in raw_context:
+            # Only keep the part before the code marker
+            raw_context = raw_context.split(code_marker)[0].strip()
+        
         return raw_context.strip()
     return None
 
@@ -163,16 +174,20 @@ def generate_input_generators_parallel(df, api_key, max_rows=None, temperature=0
             completed_count += 1
             
             if completed_count % save_interval == 0:
-                interim_df = result_df.copy()
-                interim_df['input_generator'] = results
-                
+                # Save interim results as JSONL
                 timestamp = int(time.time())
                 interim_file = os.path.join(
                     output_dir, 
-                    f"df_with_input_generators_interim_{completed_count}_{timestamp}.csv"
+                    f"input_generators_interim_{completed_count}_{timestamp}.jsonl"
                 )
                 
-                interim_df.to_csv(interim_file, index=False)
+                with open(interim_file, 'w', encoding='utf-8') as f:
+                    for i, result in enumerate(results):
+                        if result is not None:
+                            record = result_df.iloc[i].to_dict()
+                            record['input_generator'] = result
+                            f.write(json.dumps(record) + '\n')
+                
                 print(f"\nInterim progress saved ({completed_count}/{len(prompts)}) to {interim_file}")
                 
                 elapsed = time.time() - start_time
@@ -181,11 +196,16 @@ def generate_input_generators_parallel(df, api_key, max_rows=None, temperature=0
                 
                 print(f"Elapsed: {elapsed:.1f}s | Rate: {rate:.2f} items/s | Est. remaining: {remaining:.1f}s")
     
-    result_df['input_generator'] = results
+    # Save final results as JSONL
+    final_file = os.path.join(output_dir, "input_generators.jsonl")
+    with open(final_file, 'w', encoding='utf-8') as f:
+        for i, result in enumerate(results):
+            if result is not None:
+                record = result_df.iloc[i].to_dict()
+                record['input_generator'] = result
+                f.write(json.dumps(record) + '\n')
     
-    final_file = os.path.join(output_dir, "df_with_input_generators.csv")
-    result_df.to_csv(final_file, index=False)
-    print(f"Saved DataFrame with {len(result_df)} rows to {final_file}")
+    print(f"Saved results with {len(results)} rows to {final_file}")
     
     success_count = sum(1 for r in results if r is not None and not str(r).startswith("# ERROR:"))
     error_count = sum(1 for r in results if r is not None and str(r).startswith("# ERROR:"))
@@ -212,24 +232,26 @@ def clean_code_block(code_text):
 
 def process_and_generate(input_file, output_file, api_key, max_rows=None, temperature=0.3, max_workers=5):
     """Process the dataset and generate input generators line by line."""
-    # Create output file and write header
-    with open(output_file, 'w', encoding='utf-8') as f:
-        f.write('context,reference_code,input_generator\n')
-    
-    # Process input file line by line
+    records = []
     processed_count = 0
+    
     with open(input_file, 'r', encoding='utf-8') as f:
         for line in tqdm(f):
             if max_rows and processed_count >= max_rows:
                 break
                 
             try:
+                # Parse the JSONL line
                 item = json.loads(line)
-                if 'prompt' not in item:
-                    continue
                 
+                # Extract code from the item if it exists, otherwise from prompt
+                if 'code' in item:
+                    reference_code = item['code']
+                else:
+                    reference_code = extract_reference_code(item['prompt'])
+                
+                # Extract context from prompt
                 context = extract_context(item['prompt'])
-                reference_code = extract_reference_code(item['prompt'])
                 
                 if not context or not reference_code:
                     continue
@@ -246,14 +268,22 @@ def process_and_generate(input_file, output_file, api_key, max_rows=None, temper
                     # Clean the input generator code
                     input_generator = clean_code_block(input_generator)
                     
-                    # Write to output file
-                    row = {
+                    # Create a single record
+                    record = {
                         'context': context,
                         'reference_code': reference_code,
                         'input_generator': input_generator
                     }
-                    with open(output_file, 'a', encoding='utf-8') as out_f:
-                        writer = pd.DataFrame([row]).to_csv(out_f, header=False, index=False)
+                    
+                    # Write record directly to file to avoid memory issues
+                    if processed_count == 0:
+                        # Write header for first record
+                        with open(output_file, 'w', encoding='utf-8') as out_f:
+                            out_f.write(json.dumps(record) + '\n')
+                    else:
+                        # Append subsequent records
+                        with open(output_file, 'a', encoding='utf-8') as out_f:
+                            out_f.write(json.dumps(record) + '\n')
                     
                     processed_count += 1
                     
@@ -265,6 +295,47 @@ def process_and_generate(input_file, output_file, api_key, max_rows=None, temper
                 continue
     
     return processed_count
+
+def jsonl_to_csv(jsonl_file, csv_file):
+    """Convert JSONL to CSV, properly handling commas and newlines in the data."""
+    # Read all records
+    records = []
+    with open(jsonl_file, 'r', encoding='utf-8') as f:
+        for line in f:
+            try:
+                records.append(json.loads(line))
+            except json.JSONDecodeError:
+                print(f"Error decoding line in {jsonl_file}")
+                continue
+    
+    if not records:
+        print(f"No valid records found in {jsonl_file}")
+        return
+    
+    # Define field order and process fields
+    fieldnames = ["context", "input_generator", "reference_code"]
+    
+    # Write to CSV with proper handling
+    with open(csv_file, 'w', encoding='utf-8', newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames, quoting=csv.QUOTE_ALL)
+        writer.writeheader()
+        
+        for record in records:
+            processed = {}
+            for field in fieldnames:
+                # Get value or empty string if missing
+                value = record.get(field, '')  
+                
+                # Clean the value
+                if isinstance(value, str):
+                    # Replace newlines with spaces and strip extra whitespace
+                    value = value.replace('\n', ' ').strip()
+                    
+                processed[field] = value
+            
+            writer.writerow(processed)
+    
+    print(f"Successfully converted {jsonl_file} to {csv_file}")
 
 def main():
     """Main function to generate input generators."""
@@ -288,7 +359,7 @@ def main():
     input_file = args.input_file
     output_dir = os.path.abspath(args.output_dir)
     api_key = args.api_key
-    max_rows = 10 if args.test_mode else None
+    max_rows = 1 if args.test_mode else None
     temperature = args.temperature
     max_workers = args.max_workers
     
@@ -304,7 +375,7 @@ def main():
     print(f"  Max workers: {max_workers}")
     
     # Generate input generators and save to file
-    output_name = 'test.csv' if args.test_mode else 'input_generators.csv'
+    output_name = 'test.jsonl' if args.test_mode else 'input_generators.jsonl'
     output_file = os.path.join(output_dir, output_name)
     
     print("\nGenerating input generators...")
@@ -320,12 +391,23 @@ def main():
     print(f"\nPipeline completed. Generated input generators for {processed_count} problems")
     print(f"Output saved to {output_file}")
     
-    # Verify file exists and print its size
+    # Convert JSONL to CSV for easier viewing
+    csv_file = output_file.replace('.jsonl', '.csv')
+    print("\nConverting to CSV for easier viewing...")
+    jsonl_to_csv(output_file, csv_file)
+    
+    # Verify files exist and print their sizes
     if os.path.exists(output_file):
-        file_size = os.path.getsize(output_file) / 1024  # Convert to KB
-        print(f"File successfully created! Size: {file_size:.2f} KB")
+        jsonl_size = os.path.getsize(output_file) / 1024  # Convert to KB
+        print(f"JSONL file successfully created! Size: {jsonl_size:.2f} KB")
     else:
-        print("Warning: Output file was not created successfully!")
+        print("Warning: JSONL file was not created successfully!")
+        
+    if os.path.exists(csv_file):
+        csv_size = os.path.getsize(csv_file) / 1024  # Convert to KB
+        print(f"CSV file successfully created! Size: {csv_size:.2f} KB")
+    else:
+        print("Warning: CSV file was not created successfully!")
 
 if __name__ == "__main__":
     main() 

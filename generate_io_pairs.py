@@ -6,6 +6,7 @@ from tqdm import tqdm
 import pandas as pd
 from pympler import asizeof
 import argparse
+import csv
 
 def strict_check_size(obj):
     """Check if object size is reasonable (less than 1KB)."""
@@ -78,58 +79,94 @@ print(json.dumps(io_pairs))
 
 def process_and_generate_io_pairs(input_file, output_file, num_pairs=10, timeout=30):
     """Process input file line by line and generate I/O pairs."""
-    # Create output file and write header
-    with open(output_file, 'w', encoding='utf-8') as f:
-        f.write('context,reference_code,input_generator,io_pairs\n')
-    
-    # Process input file line by line
     processed_count = 0
     success_count = 0
     
-    # Use csv module for proper handling of quoted fields
-    import csv
-    with open(input_file, 'r', encoding='utf-8') as f:
-        reader = csv.DictReader(f)
-        for row in tqdm(reader):
-            try:
-                if pd.isna(row['input_generator']) or str(row['input_generator']).startswith("# ERROR:"):
-                    # Write row with empty io_pairs
-                    row['io_pairs'] = '[]'
-                else:
-                    # Generate I/O pairs
-                    pairs = generate_io_pairs(
-                        row['input_generator'],
-                        row['reference_code'],
-                        num_pairs=num_pairs
-                    )
+    # Process each line in the input JSONL
+    with open(output_file, 'w', encoding='utf-8') as out_f:
+        with open(input_file, 'r', encoding='utf-8') as in_f:
+            for line in tqdm(in_f):
+                try:
+                    # Parse the input JSONL line
+                    record = json.loads(line)
                     
-                    if pairs:
-                        success_count += 1
+                    if pd.isna(record['input_generator']) or str(record['input_generator']).startswith("# ERROR:"):
+                        # Add empty io_pairs
+                        record['io_pairs'] = []
+                    else:
+                        # Generate I/O pairs
+                        pairs = generate_io_pairs(
+                            record['input_generator'],
+                            record['reference_code'],
+                            num_pairs=num_pairs
+                        )
+                        
+                        if pairs:
+                            success_count += 1
+                        
+                        # Add io_pairs to record
+                        record['io_pairs'] = pairs
                     
-                    # Add I/O pairs to row
-                    row['io_pairs'] = json.dumps(pairs)
-                
-                # Write row to output file
-                with open(output_file, 'a', encoding='utf-8', newline='') as out_f:
-                    writer = csv.DictWriter(out_f, fieldnames=['context', 'reference_code', 'input_generator', 'io_pairs'])
-                    writer.writerow(row)
-                
-                processed_count += 1
-                
-                if processed_count % 10 == 0:
-                    print(f"\nProcessed {processed_count} items, {success_count} successful...")
+                    # Write record to output file
+                    out_f.write(json.dumps(record) + '\n')
                     
-            except Exception as e:
-                print(f"Error processing row: {str(e)}")
-                continue
+                    processed_count += 1
+                    
+                    if processed_count % 10 == 0:
+                        print(f"\nProcessed {processed_count} items, {success_count} successful...")
+                        
+                except Exception as e:
+                    print(f"Error processing line: {str(e)}")
+                    continue
     
     return processed_count, success_count
+
+def jsonl_to_csv(jsonl_file, csv_file):
+    """Convert JSONL to CSV, properly handling commas and newlines in the data."""
+    # Read all records
+    records = []
+    with open(jsonl_file, 'r', encoding='utf-8') as f:
+        for line in f:
+            try:
+                records.append(json.loads(line))
+            except json.JSONDecodeError:
+                print(f"Error decoding line in {jsonl_file}")
+                continue
+    
+    if not records:
+        print(f"No valid records found in {jsonl_file}")
+        return
+    
+    # Define field order and process fields
+    fieldnames = ["context", "reference_code", "input_generator", "io_pairs"]
+    
+    # Write to CSV with proper handling
+    with open(csv_file, 'w', encoding='utf-8', newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames, quoting=csv.QUOTE_ALL)
+        writer.writeheader()
+        
+        for record in records:
+            processed = {}
+            for field in fieldnames:
+                # Get value or empty string if missing
+                value = record.get(field, '')  
+                
+                # Clean the value
+                if isinstance(value, str):
+                    # Replace newlines with spaces and strip extra whitespace
+                    value = value.replace('\n', ' ').strip()
+                    
+                processed[field] = value
+            
+            writer.writerow(processed)
+    
+    print(f"Successfully converted {jsonl_file} to {csv_file}")
 
 def main():
     """Main function to generate I/O pairs."""
     parser = argparse.ArgumentParser(description='Generate I/O pairs from input generators')
     parser.add_argument('--input_file', type=str, required=True,
-                      help='Path to input CSV file with generators')
+                      help='Path to input JSONL file with generators')
     parser.add_argument('--output_dir', type=str, default='generated_data',
                       help='Directory to save output files')
     parser.add_argument('--test_mode', action='store_true',
@@ -162,7 +199,7 @@ def main():
         return
     
     # Generate I/O pairs
-    output_name = 'test.csv' if args.test_mode else 'final_dataset.csv'
+    output_name = 'test.jsonl' if args.test_mode else 'final_dataset.jsonl'
     output_file = os.path.join(output_dir, output_name)
     
     print("\nGenerating I/O pairs...")
@@ -176,16 +213,27 @@ def main():
     print(f"\nPipeline completed. Generated I/O pairs for {processed_count} problems")
     print(f"Output saved to {output_file}")
     
+    # Convert JSONL to CSV for easier viewing
+    csv_file = output_file.replace('.jsonl', '.csv')
+    print("\nConverting to CSV for easier viewing...")
+    jsonl_to_csv(output_file, csv_file)
+    
     # Print success rate
     success_rate = success_count / processed_count * 100 if processed_count > 0 else 0
     print(f"Success rate: {success_rate:.1f}% ({success_count} out of {processed_count} problems)")
     
-    # Verify file exists and print its size
+    # Verify files exist and print their sizes
     if os.path.exists(output_file):
-        file_size = os.path.getsize(output_file) / 1024  # Convert to KB
-        print(f"File successfully created! Size: {file_size:.2f} KB")
+        jsonl_size = os.path.getsize(output_file) / 1024  # Convert to KB
+        print(f"JSONL file successfully created! Size: {jsonl_size:.2f} KB")
     else:
-        print("Warning: Output file was not created successfully!")
+        print("Warning: JSONL file was not created successfully!")
+        
+    if os.path.exists(csv_file):
+        csv_size = os.path.getsize(csv_file) / 1024  # Convert to KB
+        print(f"CSV file successfully created! Size: {csv_size:.2f} KB")
+    else:
+        print("Warning: CSV file was not created successfully!")
 
 if __name__ == "__main__":
     main() 
