@@ -1,5 +1,0 @@
-cirq==1.4.1
-cirq-rigetti==1.4.1
-cpmpy==0.9.23
-pyquil==4.14.3
-quil==0.13.1

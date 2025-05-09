@@ -11,3 +11,5 @@ ast-pyedur_full_subset_100_5.jsonl
 /test_run
 /generated_data
 validate_jsonl_format.py
+/CodeIO-RL/kmeans_cache
+/CodeIO-RL/hdbscan_cache

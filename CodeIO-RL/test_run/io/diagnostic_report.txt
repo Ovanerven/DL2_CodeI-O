@@ -1,0 +1,97 @@
+IO GENERATION DIAGNOSTIC REPORT
+Generated: 2025-05-09 02:05:17
+Total records: 20
+Successful: 19 (95.0%)
+Failed: 1 (5.0%)
+
+ANALYSIS OF FAILED RECORDS
+================================================================================
+
+FAILED RECORD #1
+--------------------------------------------------------------------------------
+ACTUAL ERRORS ENCOUNTERED:
+- ERROR IN MAIN_SOLUTION (seed=43): shapes (14,1) and (2,1) not aligned: 1 (dim 1) != 2 (dim 0)
+- ERROR IN MAIN_SOLUTION (seed=46): shapes (19,1) and (2,1) not aligned: 1 (dim 1) != 2 (dim 0)
+- ERROR IN MAIN_SOLUTION (seed=49): shapes (18,1) and (2,1) not aligned: 1 (dim 1) != 2 (dim 0)
+- ERROR IN MAIN_SOLUTION (seed=55): shapes (21,1) and (2,1) not aligned: 1 (dim 1) != 2 (dim 0)
+- ERROR IN MAIN_SOLUTION (seed=57): shapes (15,1) and (2,1) not aligned: 1 (dim 1) != 2 (dim 0)
+
+DETAILED ERROR LOGS:
+Error 1:
+ERROR IN MAIN_SOLUTION (seed=43): shapes (14,1) and (2,1) not aligned: 1 (dim 1) != 2 (dim 0)
+Traceback (most recent call last):
+  File "<string>", line 180, in <module>
+  File "<string>", line 140, in main_solution
+ValueError: shapes (14,1) and (2,1) not aligned: 1 (dim 1) != 2 (dim 0)
+
+
+Error 2:
+ERROR IN MAIN_SOLUTION (seed=46): shapes (19,1) and (2,1) not aligned: 1 (dim 1) != 2 (dim 0)
+Traceback (most recent call last):
+  File "<string>", line 180, in <module>
+  File "<string>", line 140, in main_solution
+ValueError: shapes (19,1) and (2,1) not aligned: 1 (dim 1) != 2 (dim 0)
+
+
+Error 3:
+ERROR IN MAIN_SOLUTION (seed=49): shapes (18,1) and (2,1) not aligned: 1 (dim 1) != 2 (dim 0)
+Traceback (most recent call last):
+  File "<string>", line 180, in <module>
+  File "<string>", line 140, in main_solution
+ValueError: shapes (18,1) and (2,1) not aligned: 1 (dim 1) != 2 (dim 0)
+
+
+
+TRUNCATED INPUT GENERATOR:
+import numpy as np
+import random
+
+def input_generator():
+    # Generate a random number of data points between 10 and 100
+    n = random.randint(10, 100)
+    
+    # Generate random X_data (features) between -10 and 10
+    X_data = [random.uniform(-10, 10) for _ in range(n)]
+    
+    # Generate rando...
+
+
+TRUNCATED REFERENCE CODE:
+# import necessary packages
+import numpy as np
+
+# main function
+def main_solution(X_data, y_data, alpha, iterations):
+    # Convert JSON serializable inputs to numpy matrices
+    X = np.matrix(X_data).T
+    y = np.matrix(y_data).T
+    theta = np.matrix([0, 1]).T
+
+    for i in range(iterations):
+    ...
+
+================================================================================
+
+
+ERROR TYPE SUMMARY
+--------------------------------------------------------------------------------
+The following error types were encountered:
+
+ValueError: 5 occurrences (500.0%)
+Examples:
+  1. Record #1: ERROR IN MAIN_SOLUTION (seed=43): shapes (14,1) and (2,1) not aligned: 1 (dim 1) != 2 (dim 0)
+  2. Record #1: ERROR IN MAIN_SOLUTION (seed=46): shapes (19,1) and (2,1) not aligned: 1 (dim 1) != 2 (dim 0)
+  3. Record #1: ERROR IN MAIN_SOLUTION (seed=49): shapes (18,1) and (2,1) not aligned: 1 (dim 1) != 2 (dim 0)
+
+
+
+SUGGESTED SOLUTIONS BY ERROR TYPE
+--------------------------------------------------------------------------------
+
+HOW TO RERUN FAILED CASES
+--------------------------------------------------------------------------------
+To retry just the failed cases with fixed seeds, run:
+
+python generate_code_io_pipeline.py --input_file failed_cases.jsonl --skip_input_gen --output_dir retry_output
+
+Where failed_cases.jsonl contains only the records that failed previously.
