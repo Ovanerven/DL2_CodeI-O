@@ -347,7 +347,7 @@ def main():
     parser.add_argument('--api_key', type=str, required=True,
                       help='Deepseek API key')
     parser.add_argument('--test_mode', action='store_true',
-                      help='Run in test mode with only 5 samples')
+                      help='Run in test mode with only 10 samples')
     parser.add_argument('--temperature', type=float, default=0.3,
                       help='Temperature for API calls')
     parser.add_argument('--max_workers', type=int, default=5,
@@ -359,7 +359,7 @@ def main():
     input_file = args.input_file
     output_dir = os.path.abspath(args.output_dir)
     api_key = args.api_key
-    max_rows = 1 if args.test_mode else None
+    max_rows = 20 if args.test_mode else None
     temperature = args.temperature
     max_workers = args.max_workers
     
