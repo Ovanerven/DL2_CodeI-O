@@ -21,14 +21,7 @@ Given the following input:
 
 <<<<input>>>>
 
-**Required Deductive Reasoning Steps:**
-1. Analyze what the input means in the context of the problem
-2. Identify the expected transformation from input to output
-3. Step through the transformation process systematically
-4. Verify your reasoning against the expected output format
-5. Double-check your solution
-
-After completing your step-by-step reasoning, provide your final answer in the following JSON format within a code block:
+Please provide your answer in the following JSON format within a code block:
 
 ```json
 {"output": <your output>}
@@ -50,14 +43,7 @@ Given the following output:
 
 <<<<output>>>>
 
-**Required Abductive Reasoning Steps:**
-1. Analyze what the output represents in the context of the problem
-2. Work backwards to determine possible inputs that would produce this output
-3. Consider constraints on the input format
-4. Determine the most likely input values
-5. Verify that your proposed input would produce the given output
-
-After completing your step-by-step reasoning, provide your final answer in the following JSON format within a code block:
+Please provide your answer in the following JSON format within a code block:
 
 ```json
 {"input": <your input>}
@@ -79,75 +65,17 @@ Given the following input and output pairs:
 
 <<<<examples>>>>
 
-**Required Inductive Reasoning Steps:**
-1. Study the example pairs carefully to identify patterns
-2. Look for relationships between inputs and outputs
-3. Formulate a general rule or pattern based on the examples
-4. Apply your inferred rule to the new input
-5. Explain why your pattern explains the examples and leads to your answer
-
 Now, can you predict the output for the following input?
 
 <<<<input>>>>
 
-After completing your step-by-step reasoning, provide your final answer in the following JSON format within a code block:
+Please provide your answer in the following JSON format within a code block:
 
 ```json
 {"output": <your output>}
 ```
 
 Your <your output> should strictly match the output requirement as specified.
-
-IMPORTANT: After reasoning, provide ONLY the JSON answer block with your final answer. Do NOT include any other text after the JSON block."""
-
-# Define basic templates from original CodeIO (without structured reasoning steps)
-basic_output_pred_template = """You are given a question that requires some input and output variables as follows:
-
-<<<<query>>>>
-
-The input and output requirements are as follows:
-
-<<<<io_req>>>>
-
-Given the following input:
-
-<<<<input>>>>
-
-Can you predict the output without writing any code? Please reason and put your final answer in the following json format: {"output": <your output>}, where <your output> should strictly match the output requirement as specified.
-
-IMPORTANT: After reasoning, provide ONLY the JSON answer block with your final answer. Do NOT include any other text after the JSON block."""
-
-basic_input_pred_template = """You are given a question that requires some input and output variables as follows:
-
-<<<<query>>>>
-
-The input and output requirements are as follows:
-
-<<<<io_req>>>>
-
-Given the following output:
-
-<<<<output>>>>
-
-Can you predict a feasible input without writing any code? Please reason and put your final answer in the following json format: {"input": <your input>}, where <your input> should be a dictionary, even if the there is only one input variable, with keys strictly match the input variables' names as specified.
-
-IMPORTANT: After reasoning, provide ONLY the JSON answer block with your final answer. Do NOT include any other text after the JSON block."""
-
-basic_inductive_template = """You are given a question that requires some input and output variables as follows:
-
-<<<<query>>>>
-
-The input and output requirements are as follows:
-
-<<<<io_req>>>>
-
-Given the following input and output pairs:
-
-<<<<examples>>>>
-
-Can you predict the output for the following input? Please reason and put your final answer in the following json format: {"output": <your output>}, where <your output> should strictly match the output requirement as specified.
-
-<<<<input>>>>
 
 IMPORTANT: After reasoning, provide ONLY the JSON answer block with your final answer. Do NOT include any other text after the JSON block."""
 
@@ -227,7 +155,6 @@ def run_reasoning_evaluation(
     max_tokens: int = 2048,
     temperature: float = 0.7,
     use_chat_format: bool = True,
-    use_basic_prompts: bool = False,
     max_records: int = None
 ) -> Tuple[float, List[Dict[str, Any]]]:
     """
@@ -240,7 +167,6 @@ def run_reasoning_evaluation(
         max_tokens: Maximum number of tokens to generate
         temperature: Temperature for generation
         use_chat_format: Whether to use a chat format for the model
-        use_basic_prompts: Whether to use basic prompts from original CodeIO
         max_records: Maximum number of records to load from the dataset
         
     Returns:
@@ -264,11 +190,6 @@ def run_reasoning_evaluation(
         print("Using chat format for this model")
     else:
         print("Using regular text format for this model")
-    
-    if use_basic_prompts:
-        print("Using basic prompts from original CodeIO (without structured reasoning steps)")
-    else:
-        print("Using structured reasoning prompts with step-by-step guidance")
     
     print(f"Loading dataset from {dataset_path}...")
     records = load_jsonl(dataset_path, max_records)
@@ -327,7 +248,7 @@ def run_reasoning_evaluation(
         task_type = record.get('task_type', 'deductive')
         total_by_type[task_type] += 1
         
-        prompt = format_codeio_prompt(record, io_pair, task_type, use_basic_prompts)
+        prompt = format_codeio_prompt(record, io_pair, task_type)
         print(f"\nEvaluating problem {i+1}/{len(sampled_records)}...")
         print(f"Task type: {task_type}")
         print(f"Problem: {record['context'][:100]}...")
@@ -531,28 +452,18 @@ def extract_last_complete_json(s):
     
     return res
 
-def format_codeio_prompt(record, io_pair, task_type, use_basic_prompts=False):
+def format_codeio_prompt(record, io_pair, task_type):
     problem_statement = record['context']
     reference_code = record['reference_code']
     io_req = record.get('io_requirements', "Please follow the input/output format described in the problem.")
     
-    # Select appropriate templates based on use_basic_prompts flag
-    if use_basic_prompts:
-        # Use original CodeIO templates
-        if task_type == 'abductive':
-            template = basic_input_pred_template
-        elif task_type == 'inductive':
-            template = basic_inductive_template
-        else:  # Default to deductive
-            template = basic_output_pred_template
-    else:
-        # Use structured reasoning templates
-        if task_type == 'abductive':
-            template = input_pred_template
-        elif task_type == 'inductive':
-            template = inductive_template
-        else:  # Default to deductive
-            template = output_pred_template
+    # Select appropriate template based on task type
+    if task_type == 'abductive':
+        template = input_pred_template
+    elif task_type == 'inductive':
+        template = inductive_template
+    else:  # Default to deductive
+        template = output_pred_template
     
     # Format the prompt based on the task type
     if task_type == 'abductive':
@@ -614,7 +525,6 @@ def main():
     parser.add_argument('--temperature', type=float, default=0.7, help='Temperature for generation')
     parser.add_argument('--output', type=str, default="reasoning_evaluation_results.json", help='Output file for evaluation results')
     parser.add_argument('--no_chat', action='store_true', help='Disable chat format even for models that support it')
-    parser.add_argument('--basic_prompts', action='store_true', help='Use basic prompts from original CodeIO (without structured reasoning steps)')
     parser.add_argument('--max_records', type=int, help='Maximum number of records to load from the dataset')
     
     args = parser.parse_args()
@@ -627,7 +537,6 @@ def main():
         max_tokens=args.max_tokens,
         temperature=args.temperature,
         use_chat_format=not args.no_chat,
-        use_basic_prompts=args.basic_prompts,
         max_records=args.max_records
     )
     
