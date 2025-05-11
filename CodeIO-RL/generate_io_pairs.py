@@ -12,77 +12,23 @@ import tempfile
 import random
 import numpy as np
 import traceback
+import math
 
 def generate_io_pairs(input_generator_code, main_solution_code, num_pairs=10, timeout=60):
     """Generate I/O pairs using the input generator and main solution with robust subprocess handling."""
     # Create a temporary file with both functions
     temp_code = f"""
 import json
-import random
-import numpy as np
-import sys
-import traceback
 from pympler import asizeof
 
-# Helper function to make complex numbers JSON serializable
-def make_json_serializable(obj):
-    if isinstance(obj, complex):
-        return {{"real": obj.real, "imag": obj.imag, "__complex__": True}}
-    elif isinstance(obj, (list, tuple)):
-        return [make_json_serializable(item) for item in obj]
-    elif isinstance(obj, dict):
-        return {{k: make_json_serializable(v) for k, v in obj.items()}}
-    elif isinstance(obj, np.ndarray):
-        # Special handling for numpy arrays and matrices
-        try:
-            return make_json_serializable(obj.tolist())
-        except:
-            # If we can't convert to list, try as a string representation
-            return str(obj)
-    elif hasattr(obj, 'tolist'):
-        # Handle any numpy-like objects with tolist method
-        try:
-            return make_json_serializable(obj.tolist())
-        except:
-            return str(obj)
-    elif isinstance(obj, (int, float, str, bool, type(None))):
-        return obj
-    else:
-        try:
-            # Try to convert to a basic type
-            return float(obj)
-        except:
-            return str(obj)
-
-# Custom JSON encoder to handle complex numbers and numpy types
-class ComplexEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, complex):
-            return {{"real": obj.real, "imag": obj.imag, "__complex__": True}}
-        if isinstance(obj, np.ndarray):
-            try:
-                return obj.tolist()
-            except:
-                return str(obj)
-        if hasattr(obj, 'tolist'):
-            try:
-                return obj.tolist()
-            except:
-                return str(obj)
-        if isinstance(obj, np.integer):
-            return int(obj)
-        if isinstance(obj, np.floating):
-            return float(obj)
-        return json.JSONEncoder.default(self, obj)
-
 def strict_check_size(obj):
-    # Check if object size is less than 2048 bytes (increased from 1024)
-    if asizeof.asizeof(obj) >= 2048: 
+    # Check if object size is less than 1024 bytes
+    if asizeof.asizeof(obj) >= 1024: 
         return False
 
     # Check for dict type
     if isinstance(obj, dict):
-        if len(obj) >= 50:  # Check dict has fewer than 50 key-value pairs
+        if len(obj) >= 20:  # Check dict has fewer than 20 key-value pairs
             return False
         # Recursively check keys and values
         for k, v in obj.items():
@@ -91,7 +37,7 @@ def strict_check_size(obj):
 
     # Check for list, tuple, or set
     elif isinstance(obj, (list, tuple, set)):
-        if len(obj) >= 100:  # Check if the length is less than 100 (increased from 20)
+        if len(obj) >= 20:  # Check if the length is less than 20
             return False
         # Recursively check each element
         for item in obj:
@@ -100,91 +46,43 @@ def strict_check_size(obj):
 
     # Check for string
     elif isinstance(obj, str):
-        if len(obj) >= 200:  # Check if string length is less than 200 characters
+        if len(obj) >= 100:  # Check if string length is less than 100 characters
             return False
 
     # Other objects - check size in bytes
     else:
-        if asizeof.asizeof(obj) >= 256:  # Check if object size is less than 256 bytes
+        if asizeof.asizeof(obj) >= 128:  # Check if object size is less than 128 bytes
             return False
 
     # If all checks are passed, return True
     return True
-
-# Keep track of errors for diagnosis
-error_log = []
 
 # Define the input generator and main solution functions
 {input_generator_code}
 
 {main_solution_code}
 
-# Generate I/O pairs using systematic seeds
+# Generate I/O pairs
 diff_inputs = []
 corr_outputs = []
-base_seed = 42  # Starting seed
-
-# Try to generate with different seeds
 for i in range(1000):
     try:
-        # Set a deterministic seed based on the iteration
-        current_seed = base_seed + i
-        
-        # Set the seed for both random and numpy if they're used
-        if 'random' in globals():
-            random.seed(current_seed)
-        if 'np' in globals() or 'numpy' in globals():
-            np.random.seed(current_seed)
-            
-        # Generate input with the current seed
-        try:
-            cand_input = input_generator()
-        except Exception as e:
-            error_msg = f"ERROR IN INPUT_GENERATOR (seed={{current_seed}}): {{str(e)}}\\n{{traceback.format_exc()}}"
-            print(error_msg)
-            error_log.append(error_msg)
-            continue
-        
-        # Only accept if it meets our criteria and is unique
+        cand_input = input_generator()
         if cand_input not in diff_inputs and strict_check_size(cand_input):
-            # Try to generate output
-            try:
-                cand_output = main_solution(**cand_input)
-                
-                # Make the output JSON-serializable (handle complex numbers)
-                cand_output = make_json_serializable(cand_output)
-                
-            except Exception as e:
-                error_msg = f"ERROR IN MAIN_SOLUTION (seed={{current_seed}}): {{str(e)}}\\n{{traceback.format_exc()}}"
-                print(error_msg)
-                error_log.append(error_msg)
-                continue
-            
-            # Accept if output meets criteria
+            cand_output = main_solution(**cand_input)
             if strict_check_size(cand_output) and cand_output is not None:
                 diff_inputs.append(cand_input)
                 corr_outputs.append(cand_output)
-                print(f"Generated example {{len(diff_inputs)}}/{{{num_pairs}}} with seed {{current_seed}}")
-                
-        # Stop when we have enough examples
         if len(diff_inputs) >= {num_pairs}:
             break
     except Exception as e:
-        error_msg = f"ERROR IN ITERATION {{i}} (seed={{current_seed}}): {{str(e)}}\\n{{traceback.format_exc()}}"
-        print(error_msg)
-        error_log.append(error_msg)
         continue
         
 assert len(diff_inputs) == len(corr_outputs)
 
-# Create result object with both IO pairs and error logs
-result = {{
-    "io_pairs": [{{"input": diff_inputs[i], "output": corr_outputs[i]}} for i in range(len(diff_inputs))],
-    "error_log": error_log
-}}
+iolist = [{{"input": diff_inputs[i], "output": corr_outputs[i]}} for i in range(len(diff_inputs))]
 
-# Use the custom encoder to handle complex numbers
-jsoniolist = json.dumps(result, cls=ComplexEncoder)
+jsoniolist = json.dumps(iolist)
     
 print("[JSON IOS START]" + jsoniolist + "[JSON IOS END]")
 """
@@ -230,20 +128,10 @@ print("[JSON IOS START]" + jsoniolist + "[JSON IOS END]")
                 json_str = stdout[start_index:end_index].strip()
                 
                 try:
-                    # Parse the result with IO pairs and error log
+                    # Parse the result
                     result = json.loads(json_str)
-                    
-                    # If running within our diagnostic pipeline, include error logs
-                    if isinstance(result, dict) and "io_pairs" in result:
-                        io_pairs = result["io_pairs"]
-                        error_log = result.get("error_log", [])
-                        return {"io_pairs": io_pairs, "error_log": error_log}
-                    else:
-                        # For backward compatibility
-                        return {"io_pairs": result, "error_log": []}
-                        
+                    return {"io_pairs": result, "error_log": []}
                 except json.JSONDecodeError:
-                    print(f"Error parsing JSON: {json_str[:100]}...")
                     return {"io_pairs": [], "error_log": [f"JSON decode error: {json_str[:100]}..."]}
             else:
                 # Capture stderr for error diagnosis
@@ -263,7 +151,6 @@ print("[JSON IOS START]" + jsoniolist + "[JSON IOS END]")
             else:
                 os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
             
-            print(f"Timeout expired for IO generation")
             return {"io_pairs": [], "error_log": ["Timeout expired after {timeout} seconds"]}
             
         finally:
@@ -282,7 +169,6 @@ print("[JSON IOS START]" + jsoniolist + "[JSON IOS END]")
                 pass
             
     except Exception as e:
-        print(f"Error in IO generation: {str(e)}")
         return {"io_pairs": [], "error_log": [f"Error in IO generation subprocess: {str(e)}"]}
     
     return {"io_pairs": [], "error_log": ["Unknown error occurred"]}
@@ -382,7 +268,13 @@ def process_and_generate_io_pairs(input_file, output_file, num_pairs=10, timeout
                         print(f"\nProcessed {processed_count} items, {success_count} successful...")
                         
                 except Exception as e:
-                    print(f"Error processing record {idx}: {str(e)}")
+                    error_message = f"Error processing record {idx}: {str(e)}"
+                    print(error_message)
+                    # Add error to record and write it
+                    record['io_pairs'] = []
+                    record['error_log'] = [error_message]
+                    out_f.write(json.dumps(record) + '\n')
+                    processed_count += 1
                     continue
     finally:
         # Clean up temp directory
