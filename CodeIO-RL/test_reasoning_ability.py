@@ -27,9 +27,9 @@ Please provide your answer in the following JSON format within a code block:
 {"output": <your output>}
 ```
 
-Your <your output> should strictly match the output requirement as specified.
+Your <your output> should strictly match the output requirement as specified."""
 
-IMPORTANT: After reasoning, provide ONLY the JSON answer block with your final answer. Do NOT include any other text after the JSON block."""
+# IMPORTANT: After reasoning, provide ONLY the JSON answer block with your final answer. Do NOT include any other text after the JSON block.
 
 input_pred_template = """You are given a question that requires some input and output variables as follows:
 
@@ -49,9 +49,9 @@ Please provide your answer in the following JSON format within a code block:
 {"input": <your input>}
 ```
 
-Your <your input> should be a dictionary with keys that strictly match the input variables' names as specified.
+Your <your input> should be a dictionary, even if the there is only one input variable, with keys strictly match the input variables' names as specified."""
 
-IMPORTANT: After reasoning, provide ONLY the JSON answer block with your final answer. Do NOT include any other text after the JSON block."""
+#IMPORTANT: After reasoning, provide ONLY the JSON answer block with your final answer. Do NOT include any other text after the JSON block.
 
 inductive_template = """You are given a question that requires some input and output variables as follows:
 
@@ -75,9 +75,9 @@ Please provide your answer in the following JSON format within a code block:
 {"output": <your output>}
 ```
 
-Your <your output> should strictly match the output requirement as specified.
+Your <your output> should strictly match the output requirement as specified."""
 
-IMPORTANT: After reasoning, provide ONLY the JSON answer block with your final answer. Do NOT include any other text after the JSON block."""
+# IMPORTANT: After reasoning, provide ONLY the JSON answer block with your final answer. Do NOT include any other text after the JSON block.
 
 refcode_template = """Tip: Here is a reference code snippet for this question. You can refer to this code to guide your reasoning but not copy spans of code directly.
 
