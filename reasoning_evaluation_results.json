@@ -1,7 +1,0 @@
-{
-  "model": "Qwen/Qwen2.5-3B-Instruct",
-  "dataset": "full_run_20250509_020645\\io\\final_dataset.jsonl",
-  "accuracy": 0.0,
-  "num_samples": 0,
-  "results": []
-}

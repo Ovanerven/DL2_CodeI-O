@@ -16,11 +16,7 @@ Given the following input:
 
 <<<<input>>>>
 
-Please provide your answer in the following JSON format within a code block:
-
-```json
-{"output": <your output>}
-```
+Please provide your answer in the following JSON format: {\"output\": <your output>}
 
 Your <your output> should strictly match the output requirement as specified."""
 
@@ -38,11 +34,7 @@ Given the following output:
 
 <<<<output>>>>
 
-Please provide your answer in the following JSON format within a code block:
-
-```json
-{"input": <your input>}
-```
+Please provide your answer in the following JSON format: {\"input\": <your input>}
 
 Your <your input> should be a dictionary, even if the there is only one input variable, with keys strictly match the input variables' names as specified."""
 
@@ -64,11 +56,7 @@ Now, can you predict the output for the following input?
 
 <<<<input>>>>
 
-Please provide your answer in the following JSON format within a code block:
-
-```json
-{"output": <your output>}
-```
+Please provide your answer in the following JSON format: {\"output\": <your output>}
 
 Your <your output> should strictly match the output requirement as specified."""
 
@@ -87,18 +75,32 @@ def extract_io_requirements(context: str) -> str:
         io_req = context[start_idx:]
     return io_req
 
-def add_task_type(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Add task type to each record in a round-robin fashion."""
-    task_types = ['deductive', 'abductive', 'inductive']
+def add_task_type(records: List[Dict[str, Any]], task_types: List[str]) -> List[Dict[str, Any]]:
+    """Add task type to each record in a round-robin fashion using only the specified task types."""
+    if not task_types:
+        task_types = ['deductive', 'abductive', 'inductive']
+    
     for i, rec in enumerate(records):
         rec['task_type'] = task_types[i % len(task_types)]
     return records
 
-def format_codeio_prompt(record: Dict[str, Any], io_pair: Dict[str, Any], task_type: str) -> str:
-    """Format the prompt based on the task type following test_reasoning_ability.py approach."""
+def format_codeio_prompt(record: Dict[str, Any], task_type: str) -> str:
+    """Format the prompt based on the task type following the consistent approach."""
     problem_statement = record['context']
     reference_code = record['reference_code']
     io_req = extract_io_requirements(problem_statement)
+    all_io_pairs = record.get('io_pairs', [])
+    
+    # Always use the first IO pair as the test case
+    if not all_io_pairs:
+        raise ValueError("Record has no IO pairs")
+    
+    io_pair = all_io_pairs[0]
+    input_data = io_pair['input']
+    output_data = io_pair['output']
+    
+    # For inductive tasks, use additional pairs as examples
+    example_pairs = all_io_pairs[1:5] if len(all_io_pairs) > 1 else []
     
     # Select appropriate template based on task type
     if task_type == 'abductive':
@@ -111,7 +113,7 @@ def format_codeio_prompt(record: Dict[str, Any], io_pair: Dict[str, Any], task_t
     # Format the prompt based on the task type
     if task_type == 'abductive':
         prompt = template.replace("<<<<query>>>>", problem_statement).replace("<<<<io_req>>>>", io_req)
-        output_str = json.dumps(io_pair['output'], indent=2)
+        output_str = json.dumps(output_data, indent=2)
         prompt = prompt.replace("<<<<output>>>>", output_str)
         
         # Add reference code for abductive tasks
@@ -121,16 +123,6 @@ def format_codeio_prompt(record: Dict[str, Any], io_pair: Dict[str, Any], task_t
     elif task_type == 'inductive':
         prompt = template.replace("<<<<query>>>>", problem_statement).replace("<<<<io_req>>>>", io_req)
         
-        # Get example IO pairs (up to 4 pairs, excluding the current one)
-        all_io_pairs = record.get('io_pairs', [])
-        example_pairs = []
-        example_count = 0
-        
-        for example in all_io_pairs:
-            if example != io_pair and example_count < 4:
-                example_pairs.append(example)
-                example_count += 1
-        
         # Format example pairs
         examples_str = ""
         for i, example in enumerate(example_pairs):
@@ -139,21 +131,21 @@ def format_codeio_prompt(record: Dict[str, Any], io_pair: Dict[str, Any], task_t
         prompt = prompt.replace("<<<<examples>>>>", examples_str)
         
         # Add the test input
-        input_str = json.dumps(io_pair['input'], indent=2)
+        input_str = json.dumps(input_data, indent=2)
         prompt = prompt.replace("<<<<input>>>>", input_str)
         
         # For inductive tasks, we deliberately don't add reference code to force pattern recognition
         
     else:  # Default to deductive
         prompt = template.replace("<<<<query>>>>", problem_statement).replace("<<<<io_req>>>>", io_req)
-        input_str = json.dumps(io_pair['input'], indent=2)
+        input_str = json.dumps(input_data, indent=2)
         prompt = prompt.replace("<<<<input>>>>", input_str)
         
         # Add reference code for deductive tasks
         refcode_part = refcode_template.replace("<<<<refcode>>>>", reference_code)
         prompt += "\n\n" + refcode_part
     
-    return prompt
+    return prompt, io_pair
 
 def get_expected_field_and_value(task_type: str, io_pair: Dict[str, Any]) -> tuple:
     """Get the expected field and value based on task type."""
@@ -162,7 +154,7 @@ def get_expected_field_and_value(task_type: str, io_pair: Dict[str, Any]) -> tup
     else:  # deductive or inductive
         return 'output', io_pair.get('output')
 
-def process_dataset(input_file: str, output_file: str) -> None:
+def process_dataset(input_file: str, output_file: str, task_types: List[str]) -> None:
     """Process the dataset to create a balanced set of reasoning tasks."""
     try:
         # Load the input dataset
@@ -172,43 +164,40 @@ def process_dataset(input_file: str, output_file: str) -> None:
         print(f"Loaded {len(records)} records from {input_file}")
         
         # Ensure records have io_pairs and filter out those without
-        valid_records = [r for r in records if r.get('io_pairs') and len(r.get('io_pairs', [])) >= 2]
+        valid_records = [r for r in records if r.get('io_pairs') and len(r.get('io_pairs', [])) >= 1]
         print(f"Found {len(valid_records)} records with valid IO pairs")
         
-        # Add task type to each record
-        valid_records = add_task_type(valid_records)
+        # Add task type to each record, using only the specified task types
+        valid_records = add_task_type(valid_records, task_types)
         
         # Create reasoning tasks
         tasks = []
         for record in valid_records:
             task_type = record['task_type']
-            io_pairs = record.get('io_pairs', [])
             
-            if not io_pairs or len(io_pairs) < 1:
-                continue
+            try:
+                # Format the prompt using consistent IO pair selection
+                prompt, io_pair = format_codeio_prompt(record, task_type)
                 
-            # Randomly select an IO pair for the task
-            io_pair = random.choice(io_pairs)
-            
-            # Format the prompt
-            prompt = format_codeio_prompt(record, io_pair, task_type)
-            
-            # Get expected field and value
-            expected_field, expected_value = get_expected_field_and_value(task_type, io_pair)
-            
-            # Create task
-            task = {
-                'prompt': prompt,
-                'context': record['context'],
-                'reference_code': record['reference_code'],
-                'task_type': task_type,
-                'io_pair': io_pair,
-                'expected_field': expected_field,
-                'expected_value': expected_value,
-                'solution': {expected_field: expected_value}
-            }
-            
-            tasks.append(task)
+                # Get expected field and value
+                expected_field, expected_value = get_expected_field_and_value(task_type, io_pair)
+                
+                # Create task
+                task = {
+                    'prompt': prompt,
+                    'context': record['context'],
+                    'reference_code': record['reference_code'],
+                    'task_type': task_type,
+                    'io_pair': io_pair,
+                    'expected_field': expected_field,
+                    'expected_value': expected_value,
+                    'solution': {expected_field: expected_value}
+                }
+                
+                tasks.append(task)
+            except Exception as e:
+                print(f"Error processing record: {str(e)}")
+                continue
         
         # Save the processed dataset
         with open(output_file, 'w', encoding='utf-8') as f:
@@ -218,32 +207,50 @@ def process_dataset(input_file: str, output_file: str) -> None:
         print(f"Processed dataset saved to {output_file}")
         
         # Print statistics
-        task_types = [task['task_type'] for task in tasks]
-        deductive_count = task_types.count('deductive')
-        abductive_count = task_types.count('abductive')
-        inductive_count = task_types.count('inductive')
+        task_types_count = {t: 0 for t in ['deductive', 'abductive', 'inductive']}
+        for task in tasks:
+            task_types_count[task['task_type']] += 1
         
         print(f"Task type distribution:")
-        print(f"  Deductive: {deductive_count} ({deductive_count/len(tasks)*100:.1f}%)")
-        print(f"  Abductive: {abductive_count} ({abductive_count/len(tasks)*100:.1f}%)")
-        print(f"  Inductive: {inductive_count} ({inductive_count/len(tasks)*100:.1f}%)")
+        for task_type, count in task_types_count.items():
+            if count > 0:
+                percentage = count/len(tasks)*100 if tasks else 0
+                print(f"  {task_type.capitalize()}: {count} ({percentage:.1f}%)")
         
     except Exception as e:
         print(f"Error processing dataset: {str(e)}")
 
 def main():
     parser = argparse.ArgumentParser(description='Process dataset to create reasoning tasks')
-    parser.add_argument('--input', type=str, required=False, default = 'CodeIO-RL/full_run_20250509_020645/io/final_dataset.jsonl', help='Input jsonl file path')
-    parser.add_argument('--output', type=str, required=False, default = 'final_dataset/3_reasoning_types_dataset.jsonl', help='Output jsonl file path')
+    parser.add_argument('--input', type=str, required=False, default='CodeIO-RL/full_run_20250509_020645/io/final_dataset.jsonl', help='Input jsonl file path')
+    parser.add_argument('--output', type=str, required=False, default='final_dataset/3_reasoning_types_dataset.jsonl', help='Output jsonl file path')
     parser.add_argument('--seed', type=int, default=42, help='Random seed for reproducibility')
+    parser.add_argument('--deductive', action='store_true', help='Include deductive reasoning tasks')
+    parser.add_argument('--abductive', action='store_true', help='Include abductive reasoning tasks')
+    parser.add_argument('--inductive', action='store_true', help='Include inductive reasoning tasks')
     
     args = parser.parse_args()
     
     # Set random seed for reproducibility
     random.seed(args.seed)
     
+    # Determine which task types to include
+    task_types = []
+    if args.deductive:
+        task_types.append('deductive')
+    if args.abductive:
+        task_types.append('abductive')
+    if args.inductive:
+        task_types.append('inductive')
+    
+    # If no task types are specified, include all types
+    if not task_types:
+        task_types = ['deductive', 'abductive', 'inductive']
+    
+    print(f"Including task types: {', '.join(task_types)}")
+    
     # Process the dataset
-    process_dataset(args.input, args.output)
+    process_dataset(args.input, args.output, task_types)
 
 if __name__ == "__main__":
-    main() 
+    main()
