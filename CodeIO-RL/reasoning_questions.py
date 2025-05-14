@@ -224,7 +224,7 @@ def process_dataset(input_file: str, output_file: str, task_types: List[str]) ->
 def main():
     parser = argparse.ArgumentParser(description='Process dataset to create reasoning tasks')
     parser.add_argument('--input', type=str, required=False, default='CodeIO-RL/full_run_20250509_020645/io/final_dataset.jsonl', help='Input jsonl file path')
-    parser.add_argument('--output', type=str, required=False, default='final_dataset/3_reasoning_types_dataset.jsonl', help='Output jsonl file path')
+    parser.add_argument('--output', type=str, required=False, default='final_dataset/3_reasoning_types_dataset_sorted.jsonl', help='Output jsonl file path')
     parser.add_argument('--seed', type=int, default=42, help='Random seed for reproducibility')
     parser.add_argument('--deductive', action='store_true', help='Include deductive reasoning tasks')
     parser.add_argument('--abductive', action='store_true', help='Include abductive reasoning tasks')

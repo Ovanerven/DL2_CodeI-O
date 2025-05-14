@@ -14,3 +14,5 @@ validate_jsonl_format.py
 /CodeIO-RL/kmeans_cache
 /CodeIO-RL/hdbscan_cache
 /old_stuff
+final_dataset/3_reasoning_types_dataset_unsorted.jsonl
+final_dataset/deductive_abductive_only_dataset_unsorted.jsonl
