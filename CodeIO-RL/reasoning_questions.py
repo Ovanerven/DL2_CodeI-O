@@ -167,6 +167,10 @@ def process_dataset(input_file: str, output_file: str, task_types: List[str]) ->
         valid_records = [r for r in records if r.get('io_pairs') and len(r.get('io_pairs', [])) >= 1]
         print(f"Found {len(valid_records)} records with valid IO pairs")
         
+        # Sort valid records by the length of their reference code (number of lines)
+        valid_records.sort(key=lambda r: len(r.get('reference_code', '').split('\n')))
+        print(f"Sorted records by reference code length")
+        
         # Add task type to each record, using only the specified task types
         valid_records = add_task_type(valid_records, task_types)
         
@@ -185,12 +189,9 @@ def process_dataset(input_file: str, output_file: str, task_types: List[str]) ->
                 # Create task
                 task = {
                     'prompt': prompt,
-                    'context': record['context'],
-                    'reference_code': record['reference_code'],
                     'task_type': task_type,
+                    'context': record['context'],
                     'io_pair': io_pair,
-                    'expected_field': expected_field,
-                    'expected_value': expected_value,
                     'solution': {expected_field: expected_value}
                 }
                 
