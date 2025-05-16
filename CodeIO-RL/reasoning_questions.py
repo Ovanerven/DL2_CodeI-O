@@ -189,10 +189,11 @@ def process_dataset(input_file: str, output_file: str, task_types: List[str]) ->
                 # Create task
                 task = {
                     'prompt': prompt,
+                    # 'context': record['context'],
+                    'solution': {expected_field: expected_value},
+                    'reference_code_length': len(record['reference_code'].split('\n')),
                     'task_type': task_type,
-                    'context': record['context'],
-                    'io_pair': io_pair,
-                    'solution': {expected_field: expected_value}
+                    'io_pair': io_pair
                 }
                 
                 tasks.append(task)
