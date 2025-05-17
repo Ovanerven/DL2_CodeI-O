@@ -17,7 +17,7 @@ Note that we don't combine the main with ray_trainer as ray_trainer is used by o
 
 from verl import DataProto
 import torch
-from verl.utils.reward_score import gsm8k, math, multiply, countdown, kk, reason_io
+from verl.utils.reward_score import gsm8k, math, multiply, countdown, kk
 from verl.trainer.ppo.ray_trainer import RayPPOTrainer
 
 
@@ -32,8 +32,6 @@ def _select_rm_score_fn(data_source):
         return countdown.compute_score
     elif "kk" in data_source:
         return kk.compute_score
-    elif "reason_io" in data_source:
-        return reason_io.compute_score
     else:
         raise NotImplementedError
 
@@ -84,12 +82,12 @@ class RewardManager():
             score = compute_score_fn(solution_str=sequences_str, ground_truth=ground_truth)
             reward_tensor[i, valid_response_length - 1] = score
 
-            if data_source not in already_print_data_sources:
-                already_print_data_sources[data_source] = 0
+            # if data_source not in already_print_data_sources:
+            #     already_print_data_sources[data_source] = 0
 
-            if already_print_data_sources[data_source] < self.num_examine:
-                already_print_data_sources[data_source] += 1
-                print(sequences_str)
+            # if already_print_data_sources[data_source] < self.num_examine:
+            #     already_print_data_sources[data_source] += 1
+            #     print(sequences_str)
 
         return reward_tensor
 
