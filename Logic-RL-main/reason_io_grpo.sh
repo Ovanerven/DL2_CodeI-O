@@ -2,7 +2,7 @@
 set -x
 
 # Replace with your model path
-MODEL_PATH=qwen2.5-instruct-3b
+MODEL_PATH=Qwen/Qwen2.5-3B-Instruct
 
 # Export environment variable for XFormers attention backend (optional, but can improve performance)
 export VLLM_ATTENTION_BACKEND=XFORMERS
@@ -11,6 +11,8 @@ timestamp=$(date +"%Y-%m-%d_%H-%M-%S")
 
 # Ensure the data directory exists
 mkdir -p data/reason_io
+# Ensure the logs directory exists
+mkdir -p logs/reasonio
 
 # Run the PPO training
 python3 -m verl.trainer.main_ppo \
@@ -21,7 +23,7 @@ python3 -m verl.trainer.main_ppo \
     data.val_batch_size=8 \
     data.max_prompt_length=512 \
     data.max_response_length=4096 \
-    actor_rollout_ref.model.path=qwen2.5-instruct-3b \
+    actor_rollout_ref.model.path=${MODEL_PATH} \
     actor_rollout_ref.actor.optim.lr=4e-7 \
     actor_rollout_ref.model.use_remove_padding=True \
     actor_rollout_ref.actor.ppo_mini_batch_size=32 \
