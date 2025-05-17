@@ -1,0 +1,19 @@
+#!/bin/bash
+
+#SBATCH --partition=gpu_h100
+#SBATCH --cpus-per-task=8
+#SBATCH --gpus=2
+#SBATCH --job-name=ReasonIOPPO
+#SBATCH --ntasks=1
+#SBATCH --time=01:00:00
+#SBATCH --mem=120000M
+#SBATCH --output=logs/slurm/slurm_reasonio_%A.out
+
+module purge
+module load 2023
+module load Anaconda3/2023.07-2
+
+# Activate your environment
+source activate logic
+# Run your code
+sh reason_io_grpo.sh 
