@@ -390,21 +390,8 @@ def create_logic_rl_records(tasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]
         io_pair = task.get('io_pair', {})
         ref_code_length = task.get('reference_code_length', 0)
         
-        # Create a system message for the model
-        system_message = (
-            "You are a helpful assistant. The assistant first thinks about the reasoning process "
-            "and then provides the user with the answer. The reasoning process should be "
-            "enclosed within <think> </think> tags, i.e., <think> reasoning process here </think>. "
-            "For your final answer, you must format it as a JSON object, exactly as specified in the prompt, "
-            "and enclose it within <answer> </answer> tags. "
-            "For example: <answer>{\"output\": value}</answer> or <answer>{\"input\": value}</answer> depending on what's requested. "
-            "Now the user asks you to solve a complex problem. After thinking through your reasoning, "
-            "clearly state your answer as a properly formatted JSON object within answer tags."
-        )
-        
-        # Create the chat format expected by Logic-RL
+        # Create the chat format with only user message (system message will be provided by the framework)
         chat = [
-            {"role": "system", "content": system_message},
             {"role": "user", "content": prompt}
         ]
         
