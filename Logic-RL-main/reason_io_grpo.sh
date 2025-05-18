@@ -17,8 +17,8 @@ mkdir -p logs/reasonio
 # Run the PPO training
 python3 -m verl.trainer.main_ppo \
     algorithm.adv_estimator=reinforce_plus_plus \
-    data.train_files=data/reason_io/test_logicrl_dataset_preview.parquet \
-    data.val_files=data/reason_io/test_logicrl_dataset_preview.parquet \
+    data.train_files=data/reason_io/reason_io_dataset_train.parquet \
+    data.val_files=data/reason_io/reason_io_dataset_train.parquet \
     data.train_batch_size=4 \
     data.val_batch_size=4 \
     data.max_prompt_length=10000 \
