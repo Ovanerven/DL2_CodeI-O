@@ -74,6 +74,11 @@ def extract_solution(solution_str: str) -> Tuple[Optional[Dict[str, Any]], str]:
     Returns:
         Tuple containing (extracted_answer_dict, processed_string)
     """
+    # Clean up repeated EOS tokens (appears as <|endoftext|>)
+    if "<|endoftext|>" in solution_str:
+        # Keep only the content before the first EOS token
+        solution_str = solution_str.split("<|endoftext|>")[0]
+    
     # The model might repeat the system prompt, so we need to be more flexible
     # Check if the response contains any typical response markers
     if "Assistant:" in solution_str:
