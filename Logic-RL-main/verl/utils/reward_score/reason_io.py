@@ -134,18 +134,44 @@ def validate_response_structure(processed_str: str) -> bool:
 
     return validation_passed
 
-def compare_solutions(extracted_solution: Dict[str, Any], expected_solution: Dict[str, Any]) -> Tuple[bool, str]:
+def compare_solutions(extracted_solution: Dict[str, Any], expected_solution: Any) -> Tuple[bool, str]:
     """
     Compare the extracted solution with the expected solution.
     
     Args:
         extracted_solution: The solution extracted from the model's response
-        expected_solution: The expected solution
+        expected_solution: The expected solution (can be dict or string)
         
     Returns:
         Tuple of (is_correct, explanation)
     """
-    # Check if keys match (input vs output)
+    # Handle case when expected_solution is a string
+    if isinstance(expected_solution, str):
+        try:
+            # Try to parse it as JSON
+            expected_solution = json.loads(expected_solution)
+        except json.JSONDecodeError:
+            try:
+                # Try as Python literal
+                expected_solution = ast.literal_eval(expected_solution)
+            except (ValueError, SyntaxError):
+                # Leave as is if can't be parsed
+                pass
+    
+    # If expected_solution is still a string, we need a different comparison strategy
+    if isinstance(expected_solution, str):
+        if "output" in extracted_solution:
+            # Compare string directly with output value
+            model_value = normalize_literal(extracted_solution.get("output"))
+            normalized_expected = normalize_literal(expected_solution)
+            if model_value == normalized_expected:
+                return True, "Model's answer matches expected answer"
+            else:
+                return False, f"Model's answer '{model_value}' does not match expected '{normalized_expected}'"
+        else:
+            return False, f"Expected output field missing from model's answer"
+    
+    # Check if keys match (input vs output) for dictionary case
     expected_field = list(expected_solution.keys())[0] if expected_solution else None
     if expected_field not in extracted_solution:
         return False, f"Expected field '{expected_field}' missing from model's answer"
@@ -208,14 +234,29 @@ def compute_score(
         print("[Error] Expected solution not found in reference data")
         return 0.0
     
-    # Compare extracted solution with expected
-    is_correct, explanation = compare_solutions(extracted_solution, expected_solution)
-    answer_score = 2.0 if is_correct else -1.5
+    # Debug the ground_truth and expected_solution
+    print(f"\n[Debug Ground Truth]")
+    print(f"  Type: {type(ground_truth)}")
+    print(f"  Content: {ground_truth}")
     
-    print(f"\n[Content Validation]")
-    print(f"  Expected: {expected_solution}")
-    print(f"  Extracted: {extracted_solution}")
-    print(f"  {'CORRECT' if is_correct else 'INCORRECT'}: {explanation}")
+    print(f"\n[Debug Expected Solution]")
+    print(f"  Type: {type(expected_solution)}")
+    print(f"  Content: {expected_solution}")
+    
+    # Compare extracted solution with expected
+    try:
+        is_correct, explanation = compare_solutions(extracted_solution, expected_solution)
+        answer_score = 2.0 if is_correct else -1.5
+        
+        print(f"\n[Content Validation]")
+        print(f"  Expected: {expected_solution}")
+        print(f"  Extracted: {extracted_solution}")
+        print(f"  {'CORRECT' if is_correct else 'INCORRECT'}: {explanation}")
+    except Exception as e:
+        print(f"\n[Error in Validation] {str(e)}")
+        import traceback
+        traceback.print_exc()
+        answer_score = -1.5
     
     # Calculate total score (format + answer)
     total_score = format_score + (answer_score if format_correct else 0)
