@@ -17,7 +17,11 @@ Given the following input:
 
 <<<<input>>>>
 
-Please provide your answer in the following JSON format: {\"output\": <your output>}
+Can you predict the output without writing any code?
+
+First, think about how to solve this problem. Then, provide your final answer in the following format:
+
+<answer>{"output": <your output>}</answer>
 
 Your <your output> should strictly match the output requirement as specified."""
 
@@ -35,7 +39,11 @@ Given the following output:
 
 <<<<output>>>>
 
-Please provide your answer in the following JSON format: {\"input\": <your input>}
+Can you predict a feasible input without writing any code?
+
+First, think about how to solve this problem. Then, provide your final answer in the following format:
+
+<answer>{"input": <your input>}</answer>
 
 Your <your input> should be a dictionary, even if the there is only one input variable, with keys strictly match the input variables' names as specified."""
 
@@ -57,7 +65,9 @@ Now, can you predict the output for the following input?
 
 <<<<input>>>>
 
-Please provide your answer in the following JSON format: {\"output\": <your output>}
+First, think about how to solve this problem. Then, provide your final answer in the following format:
+
+<answer>{"output": <your output>}</answer>
 
 Your <your output> should strictly match the output requirement as specified."""
 

@@ -34,22 +34,36 @@ def extract_json_answer(s: str) -> Optional[Dict[str, Any]]:
     Pulls out the JSON-like blob inside <answer>…</answer> (or <answer>…<answer>)
     and returns it as a Python object, using json.loads first, then ast.literal_eval.
     """
-    # 1) allow a closing </answer> or a stray <answer>
-    pattern = r'<answer>\s*(\{[\s\S]*?\})\s*(?:</answer>|<answer>)'
-    m = re.search(pattern, s, re.IGNORECASE)
-    if not m:
-        return None
-
-    blob = m.group(1)
-    # 2) try strict JSON
-    try:
-        return json.loads(blob)
-    except json.JSONDecodeError:
-        # 3) fall back to Python literal
-        try:
-            return ast.literal_eval(blob)
-        except (ValueError, SyntaxError):
-            return None
+    # Find all answer blocks - try different pattern variations
+    patterns = [
+        r'<answer>\s*(\{[\s\S]*?\})\s*</answer>',  # Standard closing tag
+        r'<answer>\s*(\{[\s\S]*?\})\s*<answer>',   # Repeated opening tag (typo)
+        r'<answer>\s*(\{[\s\S]*?\})\s*$'           # Tag at end without closing
+    ]
+    
+    for pattern in patterns:
+        matches = re.findall(pattern, s, re.IGNORECASE)
+        if matches:
+            # Use the last match (most likely the final answer after reasoning)
+            # Also skip empty answers like {}
+            valid_matches = [m for m in matches if m.strip() != '{}']
+            blob = valid_matches[-1] if valid_matches else matches[-1]
+            
+            # Try to parse the answer
+            try:
+                # 1) try strict JSON
+                return json.loads(blob)
+            except json.JSONDecodeError:
+                # 2) fall back to Python literal
+                try:
+                    return ast.literal_eval(blob)
+                except (ValueError, SyntaxError):
+                    # Continue to the next pattern if parsing fails
+                    continue
+    
+    # If we couldn't find or parse an answer with any pattern
+    print("[Error] Failed to find or parse a valid answer in the response")
+    return None
 
 def extract_solution(solution_str: str) -> Tuple[Optional[Dict[str, Any]], str]:
     """Extracts the final answer from the model's response string.
@@ -60,14 +74,17 @@ def extract_solution(solution_str: str) -> Tuple[Optional[Dict[str, Any]], str]:
     Returns:
         Tuple containing (extracted_answer_dict, processed_string)
     """
-    # Split response to isolate assistant output
+    # The model might repeat the system prompt, so we need to be more flexible
+    # Check if the response contains any typical response markers
     if "Assistant:" in solution_str:
         processed_str = solution_str.split("Assistant:", 1)[1]
     elif "<|im_start|>assistant" in solution_str:
         processed_str = solution_str.split("<|im_start|>assistant", 1)[1]
     else:
-        print("[Error] Failed to locate model response header")
-        return None, solution_str
+        # If we can't find the typical markers, just use the whole string
+        # This allows us to at least try to find the answer within it
+        print("[Warning] Could not locate model response header, using full response")
+        processed_str = solution_str
 
     # Extract the JSON answer using the extract_json_answer function
     answer_dict = extract_json_answer(processed_str)
@@ -81,38 +98,53 @@ def validate_response_structure(processed_str: str) -> bool:
         processed_str: Processed response string from the model
         
     Returns:
-        Boolean indicating whether all formatting requirements are met
+        Boolean indicating whether minimum formatting requirements are met
     """
     print("\n[Structure Validation]")
     validation_passed = True
 
     # Check required tags
-    tags = {
-        'think_start': ('<think>', 1),
-        'think_end': ('</think>', 1),
-        'answer_start': ('<answer>', 1),
-        'answer_end': ('</answer>', 1)
+    # Now we only require <answer> tags as essential
+    essential_tags = {
+        'answer_start': ('<answer>', 1),  # Must have at least one answer tag
     }
-
+    
+    optional_tags = {
+        'answer_end': ('</answer>', 0),  # Optional closing tag (some models might miss it)
+        'think_start': ('<think>', 0),   # Optional thinking section
+        'think_end': ('</think>', 0)     # Optional closing thinking tag
+    }
+    
+    # Count tag occurrences
+    tags_to_check = {**essential_tags, **optional_tags}
     positions = {}
-    for tag_name, (tag_str, expected_count) in tags.items():
+    for tag_name, (tag_str, _) in tags_to_check.items():
         count = processed_str.count(tag_str)
         positions[tag_name] = pos = processed_str.find(tag_str)
-        
         print(f"  {tag_str}: count={count}, position={pos}")
-        
-        if count != expected_count:
-            print(f"  [Error] {tag_str} appears {count} times (expected {expected_count})")
+    
+    # Check essential tags are present
+    for tag_name, (tag_str, expected_count) in essential_tags.items():
+        count = processed_str.count(tag_str)
+        if count < expected_count:
+            print(f"  [Error] {tag_str} appears {count} times (expected at least {expected_count})")
             validation_passed = False
 
-    # Verify tag order
-    if (positions['think_start'] > positions['think_end'] or
-        positions['think_end'] > positions['answer_start'] or
-        positions['answer_start'] > positions['answer_end']):
-        print("  [Error] Incorrect tag order: Expected <think>...</think><answer>...</answer>")
-        validation_passed = False
+    # Check if <answer> tag contains valid content
+    if validation_passed:
+        # If we found answer but couldn't extract JSON, it's likely invalid
+        answer_json = extract_json_answer(processed_str)
+        if answer_json is None:
+            print("  [Error] Found <answer> tag but couldn't extract valid JSON content")
+            validation_passed = False
+        else:
+            print("  Found valid JSON content inside <answer> tags")
+    
+    # Provide a final summary
+    if validation_passed:
+        print("  Overall structure validation passed")
     else:
-        print("  Tag sequence validation passed")
+        print("  Overall structure validation failed")
 
     return validation_passed
 
