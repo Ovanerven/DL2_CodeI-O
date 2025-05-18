@@ -125,10 +125,12 @@ class RLHFDataset(Dataset):
 
         chat = row_dict.pop(self.prompt_key)
 
-        # Apply the chat template to preserve both system and user messages
-        prompt_with_chat_template = self.tokenizer.apply_chat_template(chat, 
-                                                                      add_generation_prompt=True, 
-                                                                      tokenize=False)
+        # Apply the full chat template instead of just using the first message
+        prompt_with_chat_template = self.tokenizer.apply_chat_template(
+            chat, 
+            tokenize=False,
+            add_generation_prompt=True
+        )
         
         input_ids, attention_mask = verl_F.tokenize_and_postprocess_data(prompt=prompt_with_chat_template,
                                                                          tokenizer=self.tokenizer,
