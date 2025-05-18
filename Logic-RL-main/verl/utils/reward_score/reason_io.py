@@ -165,23 +165,23 @@ def compare_solutions(extracted_solution: Dict[str, Any], expected_solution: Dic
         return False, f"Model's answer '{normalized_model}' does not match expected '{normalized_expected}'"
 
 def compute_score(
-    prediction: str, reference: dict, **kwargs
-) -> Tuple[float, dict]:
+    solution_str: str, ground_truth: dict, **kwargs
+) -> float:
     """
     Compute correctness score for a prediction against a reference.
     
     Args:
-        prediction: Model's prediction string
-        reference: Reference data including expected solution
+        solution_str: Model's prediction string
+        ground_truth: Reference data including expected solution
         
     Returns:
-        Tuple of (score, dict with explanation)
+        Score as a float
     """
     print("\n" + "="*80)
     print(" Evaluating Reason-IO Response ".center(80, '='))
     
     # Extract solution from the model's prediction
-    extracted_solution, processed_str = extract_solution(prediction)
+    extracted_solution, processed_str = extract_solution(solution_str)
     
     # Print the full model response
     print(f"\n[Full Model Response]")
@@ -195,18 +195,18 @@ def compute_score(
     # Check if we got a structured solution from the model
     if extracted_solution is None:
         print("  [Error] Failed to extract solution structure")
-        return 0.0, {"reason": "Failed to extract solution structure"}
+        return 0.0
     
     if not format_correct:
         print("  [Error] Response format validation failed")
-        return 0.0, {"reason": "Invalid response structure"}
+        return 0.0
     
     # Get expected solution from the reference
-    expected_solution = reference.get("solution", {})
+    expected_solution = ground_truth.get("solution", {})
     
     if not expected_solution:
         print("[Error] Expected solution not found in reference data")
-        return 0.0, {"reason": "Reference solution not found"}
+        return 0.0
     
     # Compare extracted solution with expected
     is_correct, explanation = compare_solutions(extracted_solution, expected_solution)
@@ -227,8 +227,7 @@ def compute_score(
     print(f"  Total: {total_score}")
     print("="*80 + "\n")
     
-    # Return score (normalized to 0-1 range) and explanation
-    normalized_score = float(is_correct) if format_correct else 0.0
-    return normalized_score, {"reason": explanation}
+    # Return score
+    return total_score
 
  
