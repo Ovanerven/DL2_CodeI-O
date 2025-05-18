@@ -272,14 +272,18 @@ def process_dataset(input_file: str, output_file: str, task_types: List[str], pr
                 solution_str = json.dumps(solution)
                 io_pair_str = json.dumps(io_pair)
                 
-                # Create the Logic-RL record with flattened structure
+                # Create the Logic-RL record with nested structure
                 logic_rl_record = {
                     "prompt": chat,
                     "data_source": "reason_io",
-                    "reward_model.ground_truth.solution": solution_str,
-                    "reward_model.ground_truth.task_type": task_type,
-                    "reward_model.ground_truth.io_pair": io_pair_str,
-                    "reward_model.ground_truth.reference_code_length": ref_code_length,
+                    "reward_model": {
+                        "ground_truth": {
+                            "solution": solution_str,
+                            "task_type": task_type,
+                            "io_pair": io_pair_str,
+                            "reference_code_length": ref_code_length
+                        }
+                    },
                     "reference_code_length": ref_code_length
                 }
                 

@@ -348,7 +348,7 @@ def main():
                       help='Deepseek API key')
     parser.add_argument('--test_mode', action='store_true',
                       help='Run in test mode with only 10 samples')
-    parser.add_argument('--temperature', type=float, default=0.3,
+    parser.add_argument('--temperature', type=float, default=0.0,
                       help='Temperature for API calls')
     parser.add_argument('--max_workers', type=int, default=5,
                       help='Number of parallel workers')
