@@ -41,7 +41,7 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.rollout.gpu_memory_utilization=0.8 \
     actor_rollout_ref.rollout.n=4 \
     actor_rollout_ref.rollout.temperature=0.7 \
-    actor_rollout_ref.rollout.system_prompt="You are a helpful assistant. The assistant first thinks about the reasoning process and then provides the user with the answer. The reasoning process should be enclosed within <think> </think> tags, i.e., <think> reasoning process here </think>. For your final answer, you must format it as a JSON object, exactly as specified in the prompt, and enclose it within <answer> </answer> tags. For example: <answer>{\"output\": value}</answer> or <answer>{\"input\": value}</answer> depending on what's requested. Now the user asks you to solve a complex problem. After thinking through your reasoning, clearly state your answer as a properly formatted JSON object within answer tags." \
+    actor_rollout_ref.rollout.system_prompt=@configs.system_prompts.DEFAULT_SYSTEM_PROMPT \
     actor_rollout_ref.ref.log_prob_micro_batch_size=160 \
     actor_rollout_ref.ref.fsdp_config.param_offload=True \
     algorithm.kl_ctrl.kl_coef=0.001 \
