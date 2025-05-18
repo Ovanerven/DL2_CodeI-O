@@ -229,5 +229,3 @@ def compute_score(
     
     # Return score
     return total_score
-
- 
