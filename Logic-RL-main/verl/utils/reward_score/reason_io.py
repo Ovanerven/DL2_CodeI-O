@@ -177,10 +177,9 @@ def compute_score(solution_str: str, ground_truth: Dict[str, Any],
     # Extract model's answer
     answer_dict, processed_str = extract_solution(solution_str)
     
-    # For debugging, print a portion of the model's response
-    preview_length = min(300, len(processed_str))
-    print(f"\n[Model Response Preview]")
-    print(f"{processed_str[:preview_length]}..." if len(processed_str) > preview_length else processed_str)
+    # Print the full model response
+    print(f"\n[Full Model Response]")
+    print(processed_str)
     
     # Validate response structure
     format_correct = validate_response_structure(processed_str)
