@@ -39,7 +39,7 @@ Given the following output:
 
 <<<<output>>>>
 
-Can you predict a feasible input without writing any code?
+Can you predict the input without writing any code?
 
 First, think about how to solve this problem. Then, provide your final answer in the following format:
 
@@ -57,13 +57,15 @@ The input and output requirements are as follows:
 
 <<<<io_req>>>>
 
-Given the following input and output pairs:
+The function has already been implemented for some inputs. Here are example input-output pairs:
 
 <<<<examples>>>>
 
-Now, can you predict the output for the following input?
+Given the following input:
 
 <<<<input>>>>
+
+Can you predict the output without writing any code?
 
 First, think about how to solve this problem. Then, provide your final answer in the following format:
 
@@ -251,60 +253,13 @@ def process_dataset(input_file: str, output_file: str, task_types: List[str], pr
         
         # Save the processed dataset in the appropriate format
         if logic_rl_format:
-            # Convert to Logic-RL format
-            logic_rl_records = []
-            for task in tasks:
-                prompt = task.get('prompt', '')
-                task_type = task.get('task_type', 'unknown')
-                solution = task.get('solution', {})
-                io_pair = task.get('io_pair', {})
-                ref_code_length = task.get('reference_code_length', 0)
-                
-                # Create a system message for the model
-                system_message = (
-                    "You are a helpful assistant. The assistant first thinks about the reasoning process "
-                    "and then provides the user with the answer. The reasoning process should be "
-                    "enclosed within <think> </think> tags, i.e., <think> reasoning process here </think>. "
-                    "For your final answer, you must format it as a JSON object, exactly as specified in the prompt, "
-                    "and enclose it within <answer> </answer> tags. "
-                    "For example: <answer>{\"output\": value}</answer> or <answer>{\"input\": value}</answer> depending on what's requested. "
-                    "Now the user asks you to solve a complex problem. After thinking through your reasoning, "
-                    "clearly state your answer as a properly formatted JSON object within answer tags."
-                )
-                
-                # Create the chat format expected by Logic-RL
-                chat = [
-                    {"role": "system", "content": system_message},
-                    {"role": "user", "content": prompt}
-                ]
-                
-                # Convert nested dictionaries to strings to avoid dataframe issues
-                solution_str = json.dumps(solution)
-                io_pair_str = json.dumps(io_pair)
-                
-                # Create the Logic-RL record with nested structure
-                logic_rl_record = {
-                    "prompt": chat,
-                    "data_source": "reason_io",
-                    "reward_model": {
-                        "ground_truth": {
-                            "solution": solution_str,
-                            "task_type": task_type,
-                            "io_pair": io_pair_str,
-                            "reference_code_length": ref_code_length
-                        }
-                    },
-                    "reference_code_length": ref_code_length
-                }
-                
-                logic_rl_records.append(logic_rl_record)
-            
-            # Convert to a pandas DataFrame
-            df = pd.DataFrame(logic_rl_records)
-            
-            # Save as a Parquet file
-            df.to_parquet(output_file, index=False)
-            print(f"Processed dataset saved to {output_file} in Logic-RL format (Parquet)")
+            # Use our new function that doesn't include the system message
+            if preview_mode:
+                preview_dataset = tasks[:min(10, len(tasks))]
+                output_dir = os.path.dirname(output_file)
+                save_dataset_to_parquet(preview_dataset, f"{output_dir}/test_logicrl_dataset_preview.parquet")
+            else:
+                save_dataset_to_parquet(tasks, output_file)
         else:
             # Save as JSONL (original format)
             with open(output_file, 'w', encoding='utf-8') as f:
@@ -373,6 +328,26 @@ def main():
     
     # Process the dataset
     process_dataset(args.input, args.output, task_types, preview_mode=args.preview, logic_rl_format=args.logic_rl_format)
+
+def save_dataset_to_parquet(dataset: List[Dict[str, Any]], output_path: str):
+    """
+    Saves a dataset to a parquet file for use with VERL.
+    """
+    data = {
+        "prompt": [
+            [
+                {"role": "user", "content": example["prompt"]}
+            ]
+            for example in dataset
+        ],
+        "data_source": ["code_io"] * len(dataset),
+        "reward_model": ["reason_io"] * len(dataset),
+        "reference_code_length": [0] * len(dataset),
+    }
+    
+    df = pd.DataFrame(data)
+    df.to_parquet(output_path)
+    print(f"Saved dataset to {output_path}")
 
 if __name__ == "__main__":
     main()
