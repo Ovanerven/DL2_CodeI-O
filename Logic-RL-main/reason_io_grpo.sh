@@ -21,7 +21,7 @@ SYSTEM_PROMPT="You are a helpful assistant. The assistant first thinks about the
 echo "System prompt:"
 echo "$SYSTEM_PROMPT"
 
-# Run the PPO training
+# Run the PPO training with memory-optimized settings
 python3 -m verl.trainer.main_ppo \
     algorithm.adv_estimator=reinforce_plus_plus \
     data.train_files=data/reason_io/reason_io_dataset_train.parquet \
@@ -45,8 +45,8 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.rollout.log_prob_micro_batch_size=160 \
     actor_rollout_ref.rollout.tensor_model_parallel_size=1 \
     actor_rollout_ref.rollout.name=vllm \
-    actor_rollout_ref.rollout.gpu_memory_utilization=0.8 \
-    actor_rollout_ref.rollout.n=4 \
+    actor_rollout_ref.rollout.gpu_memory_utilization=0.7 \
+    actor_rollout_ref.rollout.n=2 \
     actor_rollout_ref.rollout.temperature=0.7 \
     actor_rollout_ref.ref.log_prob_micro_batch_size=160 \
     actor_rollout_ref.ref.fsdp_config.param_offload=True \

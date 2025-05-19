@@ -65,36 +65,68 @@ def extract_json_answer(s: str) -> Optional[Dict[str, Any]]:
     print("[Error] Failed to find or parse a valid answer in the response")
     return None
 
-def extract_solution(solution_str: str) -> Tuple[Optional[Dict[str, Any]], str]:
-    """Extracts the final answer from the model's response string.
+def extract_solution(solution_str: str) -> Tuple[Dict[str, Any], str]:
+    """
+    Extract the solution from the model's response.
     
     Args:
-        solution_str: Raw response string from the language model
+        solution_str: Model's response to the prompt
         
     Returns:
-        Tuple containing (extracted_answer_dict, processed_string)
+        Tuple of (extracted solution as dict, processed string)
     """
-    # Clean up repeated EOS tokens (appears as <|endoftext|>)
-    if "<|endoftext|>" in solution_str:
-        # Keep only the content before the first EOS token
-        solution_str = solution_str.split("<|endoftext|>")[0]
+    # Limit processing to a reasonable length to avoid memory issues
+    max_length = 10000
+    if len(solution_str) > max_length:
+        solution_str = solution_str[:max_length]
+        
+    processed_str = solution_str.strip()
     
-    # The model might repeat the system prompt, so we need to be more flexible
-    # Check if the response contains any typical response markers
-    if "Assistant:" in solution_str:
-        processed_str = solution_str.split("Assistant:", 1)[1]
-    elif "<|im_start|>assistant" in solution_str:
-        processed_str = solution_str.split("<|im_start|>assistant", 1)[1]
+    # Try to find content within <answer> tags
+    answer_content = None
+    
+    # Look for <answer> and </answer> tags
+    answer_start = processed_str.find("<answer>")
+    answer_end = processed_str.find("</answer>")
+    
+    if answer_start != -1 and answer_end != -1 and answer_start < answer_end:
+        answer_content = processed_str[answer_start + len("<answer>"):answer_end].strip()
+        
+        # Try to parse JSON content
+        try:
+            # First try standard JSON parsing
+            result = json.loads(answer_content)
+        except json.JSONDecodeError:
+            try:
+                # Replace Python expressions with valid JSON
+                answer_content = re.sub(r'(\d+)\s*\*\*\s*(\d+)', 
+                                       lambda m: str(int(m.group(1)) ** int(m.group(2))), 
+                                       answer_content)
+                # Remove any trailing commas in objects or arrays
+                answer_content = re.sub(r',\s*}', '}', answer_content)
+                answer_content = re.sub(r',\s*]', ']', answer_content)
+                # Fix unquoted keys
+                answer_content = re.sub(r'([{,])\s*(\w+)\s*:', r'\1"\2":', answer_content)
+                # Try parsing again
+                result = json.loads(answer_content)
+            except:
+                # If still failing, try ast.literal_eval with safety checks
+                try:
+                    # Only process if content is reasonably sized to avoid memory issues
+                    if len(answer_content) < 1000:
+                        result = ast.literal_eval(answer_content)
+                    else:
+                        print(f"Answer content too large for ast.literal_eval: {len(answer_content)} chars")
+                        return {}, processed_str
+                except:
+                    # Return empty solution if all parsing attempts fail
+                    print(f"Failed to parse answer content: {answer_content[:100]}...")
+                    return {}, processed_str
     else:
-        # If we can't find the typical markers, just use the whole string
-        # This allows us to at least try to find the answer within it
-        print("[Warning] Could not locate model response header, using full response")
-        processed_str = solution_str
-
-    # Extract the JSON answer using the extract_json_answer function
-    answer_dict = extract_json_answer(processed_str)
-    
-    return answer_dict, processed_str
+        # Could not find answer tags
+        return {}, processed_str
+        
+    return result, processed_str
 
 def validate_response_structure(processed_str: str) -> bool:
     """Performs comprehensive validation of response structure.
@@ -153,114 +185,111 @@ def validate_response_structure(processed_str: str) -> bool:
 
     return validation_passed
 
-def compute_score(solution_str: str, ground_truth: Dict[str, Any], 
-                 format_reward: int = 1,
-                 answer_reward: float = 2.0) -> float:
+def compute_score(
+    solution_str: str, ground_truth: dict, 
+    format_reward: int = 1, 
+    answer_reward: float = 2.0
+) -> float:
     """
-    Compute the reward score for the model's response to Reason-IO dataset.
+    Compute correctness score for a prediction against a reference.
     
     Args:
-        solution_str: The model's full response string
-        ground_truth: Dictionary containing ground truth data including expected solution
-        format_reward: Points awarded/deducted for format correctness
-        answer_reward: Points awarded/deducted for answer correctness
+        solution_str: Model's prediction string
+        ground_truth: Reference data including expected solution
+        format_reward: Points for format correctness
+        answer_reward: Points for answer correctness
         
     Returns:
-        Total score (sum of format and answer rewards)
+        Score as a float
     """
-    print("\n" + "="*80)
-    print(" Evaluating Reason-IO Response ".center(80, '='))
+    print("\n" + "="*40)
+    print(" Evaluating Reason-IO Response ".center(40, '='))
     
-    # Extract solution data from the flattened parquet structure
-    # Check for flattened keys first (from parquet)
-    solution_str_field = ground_truth.get('solution', None)
+    # Extract expected solution and task type with memory efficiency in mind
+    task_type = ground_truth.get('task_type', 'unknown')
+    expected_solution = None
+    expected_field = None
+    expected_value = None
     
-    # Try to get flattened fields from the ground truth dictionary
+    # Find solution in a memory-efficient way
     for key in ground_truth:
-        if 'reward_model.ground_truth.solution' in key:
-            solution_str_field = ground_truth[key]
-        elif 'solution' in key and isinstance(ground_truth[key], str):
-            solution_str_field = ground_truth[key]
+        if 'solution' in key:
+            temp_solution = ground_truth[key]
+            
+            # Try to parse the solution if it's a string
+            if isinstance(temp_solution, str):
+                try:
+                    expected_solution = json.loads(temp_solution)
+                    break
+                except json.JSONDecodeError:
+                    # Continue trying other fields
+                    continue
+            elif isinstance(temp_solution, dict):
+                expected_solution = temp_solution
+                break
     
-    # Parse solution if it's a string
-    if isinstance(solution_str_field, str):
-        try:
-            solution_data = json.loads(solution_str_field)
-        except (json.JSONDecodeError, TypeError):
-            solution_data = {}
-    else:
-        solution_data = solution_str_field if solution_str_field is not None else {}
+    # Extract field and value
+    if expected_solution and isinstance(expected_solution, dict) and len(expected_solution) > 0:
+        expected_field = next(iter(expected_solution.keys()))
+        expected_value = expected_solution[expected_field]
     
-    # Extract task type
-    task_type = None
-    for key in ground_truth:
-        if 'task_type' in key:
-            task_type = ground_truth[key]
-            break
-    
-    if task_type is None:
-        task_type = 'unknown'
-        
-    # Extract the expected field and value
-    expected_solution = solution_data
-    expected_field = list(expected_solution.keys())[0] if expected_solution else None  # 'input' or 'output'
-    expected_value = expected_solution.get(expected_field) if expected_field else None
-    
+    # Print ground truth information (shortened for memory efficiency)
     print(f"[Ground Truth]")
     print(f"  Task Type: {task_type}")
-    print(f"  Expected Field: {expected_field}")
-    print(f"  Expected Value: {expected_value}")
+    if expected_field:
+        print(f"  Expected Field: {expected_field}")
+        # Limit output size for large values
+        if isinstance(expected_value, str) and len(expected_value) > 100:
+            print(f"  Expected Value: {expected_value[:100]}...")
+        else:
+            print(f"  Expected Value: {expected_value}")
     
-    # Extract model's answer
-    answer_dict, processed_str = extract_solution(solution_str)
+    # Extract solution from the model's prediction (already memory-optimized)
+    extracted_solution, processed_str = extract_solution(solution_str)
     
-    # Print the full model response
-    print(f"\n[Full Model Response]")
-    print(processed_str)
+    # Print shortened model response for memory efficiency
+    print(f"\n[Model Response Preview]")
+    response_preview = processed_str[:300] + "..." if len(processed_str) > 300 else processed_str
+    print(response_preview)
     
-    # Validate response structure
+    # Validate the response structure
     format_correct = validate_response_structure(processed_str)
-    format_score = format_reward if format_correct else -abs(format_reward)
+    
+    # Calculate format score - use the exact same names as in kk.py for WandB compatibility
+    format_score = format_reward if format_correct else -format_reward
+    
     print(f"\n  Format validation: {'PASS' if format_correct else 'FAIL'}")
     print(f"  Format score: {format_score}")
     
-    # Validate answer content
+    # Content validation and scoring - match kk.py naming structure
     answer_score = 0
-    if format_correct and answer_dict:
-        print(f"\n[Content Validation]")
-        
-        # Check if the expected field exists in the model's answer
-        model_value = answer_dict.get(expected_field) if answer_dict else None
-        
-        if model_value is not None:
-            print(f"  Model answer: {model_value}")
-            
-            # Normalize both expected and model values for comparison
-            normalized_expected = normalize_literal(expected_value)
-            normalized_model = normalize_literal(model_value)
-            
-            # Compare the normalized values
-            if normalized_model == normalized_expected:
-                answer_score = answer_reward
-                print("  Content validation: CORRECT")
-            else:
-                answer_score = -1.5
-                print("  Content validation: INCORRECT")
-                print(f"  Expected: {normalized_expected}")
-                print(f"  Got: {normalized_model}")
-        else:
-            answer_score = -2.0
-            print(f"  [Error] Field '{expected_field}' missing from answer")
-    else:
-        answer_score = -2.0
+    if not format_correct or not extracted_solution:
         print("\n[Content Validation] Skipped due to format errors or missing answer")
+        answer_score = -answer_reward
+    else:
+        print("\n[Content Validation]")
+        
+        # Compare extracted solution with expected solution
+        is_correct, explanation = compare_solutions(extracted_solution, expected_solution)
+        
+        if is_correct:
+            answer_score = answer_reward
+            print(f"  Content validation: CORRECT")
+        else:
+            answer_score = -answer_reward * 0.75
+            print(f"  Content validation: INCORRECT")
+            print(f"  Expected: {expected_value}")
+            extracted_value = extracted_solution.get(expected_field, "field not found")
+            print(f"  Got: {extracted_value}")
     
+    # Calculate total score
     total_score = format_score + answer_score
-    print("\n" + "-"*80)
-    print(f" Final Score ".center(80, '-'))
+    
+    print("\n" + "-"*40)
+    print(" Final Score ".center(40, '-'))
     print(f"  Format: {format_score}")
     print(f"  Answer: {answer_score}")
     print(f"  Total: {total_score}")
-    print("="*80 + "\n")
+    print("="*40)
     
     return total_score 
