@@ -1,7 +1,7 @@
 import re
 import json
 import ast
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple, List, Union
 
 def normalize_literal(s: str):
     """
@@ -65,36 +65,54 @@ def extract_json_answer(s: str) -> Optional[Dict[str, Any]]:
     print("[Error] Failed to find or parse a valid answer in the response")
     return None
 
-def extract_solution(solution_str: str) -> Tuple[Optional[Dict[str, Any]], str]:
-    """Extracts the final answer from the model's response string.
+def extract_solution(solution_str: str) -> Tuple[Dict[str, Any], str]:
+    """
+    Extract the solution from the model's response.
     
     Args:
-        solution_str: Raw response string from the language model
+        solution_str: Model's response to the prompt
         
     Returns:
-        Tuple containing (extracted_answer_dict, processed_string)
+        Tuple of (extracted solution as dict, processed string)
     """
-    # Clean up repeated EOS tokens (appears as <|endoftext|>)
-    if "<|endoftext|>" in solution_str:
-        # Keep only the content before the first EOS token
-        solution_str = solution_str.split("<|endoftext|>")[0]
+    processed_str = solution_str.strip()
     
-    # The model might repeat the system prompt, so we need to be more flexible
-    # Check if the response contains any typical response markers
-    if "Assistant:" in solution_str:
-        processed_str = solution_str.split("Assistant:", 1)[1]
-    elif "<|im_start|>assistant" in solution_str:
-        processed_str = solution_str.split("<|im_start|>assistant", 1)[1]
+    # Try to find content within <answer> tags
+    answer_content = None
+    
+    # Look for <answer> and </answer> tags
+    answer_start = processed_str.find("<answer>")
+    answer_end = processed_str.find("</answer>")
+    
+    if answer_start != -1 and answer_end != -1 and answer_start < answer_end:
+        answer_content = processed_str[answer_start + len("<answer>"):answer_end].strip()
+        
+        # Try to parse JSON content
+        try:
+            # First try standard JSON parsing
+            result = json.loads(answer_content)
+        except json.JSONDecodeError:
+            try:
+                # If JSON parsing fails, try to replace Python expressions with valid JSON
+                # Convert Python's 10**10 syntax to numeric value
+                answer_content = re.sub(r'(\d+)\s*\*\*\s*(\d+)', 
+                                       lambda m: str(int(m.group(1)) ** int(m.group(2))), 
+                                       answer_content)
+                # Try parsing again
+                result = json.loads(answer_content)
+            except:
+                # If still failing, try ast.literal_eval
+                try:
+                    result = ast.literal_eval(answer_content)
+                except:
+                    # Return empty solution if all parsing attempts fail
+                    print(f"Failed to parse answer content: {answer_content}")
+                    return {}, processed_str
     else:
-        # If we can't find the typical markers, just use the whole string
-        # This allows us to at least try to find the answer within it
-        print("[Warning] Could not locate model response header, using full response")
-        processed_str = solution_str
-
-    # Extract the JSON answer using the extract_json_answer function
-    answer_dict = extract_json_answer(processed_str)
-    
-    return answer_dict, processed_str
+        # Could not find answer tags
+        return {}, processed_str
+        
+    return result, processed_str
 
 def validate_response_structure(processed_str: str) -> bool:
     """Performs comprehensive validation of response structure.
@@ -153,114 +171,173 @@ def validate_response_structure(processed_str: str) -> bool:
 
     return validation_passed
 
-def compute_score(solution_str: str, ground_truth: Dict[str, Any], 
-                 format_reward: int = 1,
-                 answer_reward: float = 2.0) -> float:
+def compare_solutions(extracted_solution: Dict[str, Any], expected_solution: Any) -> Tuple[bool, str]:
     """
-    Compute the reward score for the model's response to Reason-IO dataset.
+    Compare the extracted solution with the expected solution.
     
     Args:
-        solution_str: The model's full response string
-        ground_truth: Dictionary containing ground truth data including expected solution
-        format_reward: Points awarded/deducted for format correctness
-        answer_reward: Points awarded/deducted for answer correctness
+        extracted_solution: The solution extracted from the model's response
+        expected_solution: The expected solution (can be dict or string)
         
     Returns:
-        Total score (sum of format and answer rewards)
+        Tuple of (is_correct, explanation)
+    """
+    # Handle case when expected_solution is a string
+    if isinstance(expected_solution, str):
+        try:
+            # Try to parse it as JSON
+            expected_solution = json.loads(expected_solution)
+        except json.JSONDecodeError:
+            try:
+                # Try as Python literal
+                expected_solution = ast.literal_eval(expected_solution)
+            except:
+                # Use as is if parsing fails
+                pass
+    
+    # Special handling for numeric comparisons
+    def compare_values(model_value, expected_value):
+        # Convert strings to numbers for accurate comparison
+        if isinstance(model_value, str) and model_value.isdigit():
+            model_value = int(model_value)
+        if isinstance(expected_value, str) and expected_value.isdigit():
+            expected_value = int(expected_value)
+            
+        # Handle numeric comparison with tolerance for floats
+        if isinstance(model_value, (int, float)) and isinstance(expected_value, (int, float)):
+            if isinstance(model_value, float) or isinstance(expected_value, float):
+                # Use small tolerance for float comparison
+                return abs(model_value - expected_value) < 1e-6
+            else:
+                return model_value == expected_value
+        
+        # Handle dict/list comparison
+        if isinstance(model_value, (dict, list)) and isinstance(expected_value, (dict, list)):
+            return json.dumps(model_value, sort_keys=True) == json.dumps(expected_value, sort_keys=True)
+            
+        # Fallback to string comparison
+        return str(model_value).strip() == str(expected_value).strip()
+    
+    # If both are dictionaries
+    if isinstance(expected_solution, dict) and isinstance(extracted_solution, dict):
+        # First check if the key exists
+        for key in expected_solution:
+            if key not in extracted_solution:
+                return False, f"Missing expected key: {key}"
+                
+            # Check if values match
+            if not compare_values(extracted_solution[key], expected_solution[key]):
+                return False, f"Values don't match for key {key}: Expected {expected_solution[key]}, got {extracted_solution[key]}"
+                
+        return True, "Solutions match"
+        
+    # Direct comparison for other cases
+    return compare_values(extracted_solution, expected_solution), "Direct comparison"
+
+def compute_score(
+    solution_str: str, ground_truth: dict, **kwargs
+) -> float:
+    """
+    Compute correctness score for a prediction against a reference.
+    
+    Args:
+        solution_str: Model's prediction string
+        ground_truth: Reference data including expected solution
+        
+    Returns:
+        Score as a float
     """
     print("\n" + "="*80)
     print(" Evaluating Reason-IO Response ".center(80, '='))
     
-    # Extract solution data from the flattened parquet structure
-    # Check for flattened keys first (from parquet)
-    solution_str_field = ground_truth.get('solution', None)
+    # Print ground truth information for debugging
+    task_type = ground_truth.get('task_type', 'unknown')
+    expected_solution = None
+    expected_field = None
+    expected_value = None
     
-    # Try to get flattened fields from the ground truth dictionary
+    # Extract solution data
     for key in ground_truth:
-        if 'reward_model.ground_truth.solution' in key:
-            solution_str_field = ground_truth[key]
-        elif 'solution' in key and isinstance(ground_truth[key], str):
-            solution_str_field = ground_truth[key]
+        if 'solution' in key:
+            expected_solution = ground_truth[key]
+            
+            # Try to parse the solution if it's a string
+            if isinstance(expected_solution, str):
+                try:
+                    expected_solution = json.loads(expected_solution)
+                except json.JSONDecodeError:
+                    print(f"[Warning] Failed to parse ground truth solution: {expected_solution}")
+                    try:
+                        expected_solution = ast.literal_eval(expected_solution)
+                    except:
+                        print(f"[Error] Failed to parse solution string using ast.literal_eval")
+            
+            if isinstance(expected_solution, dict) and len(expected_solution) > 0:
+                expected_field = list(expected_solution.keys())[0]
+                expected_value = expected_solution[expected_field]
+                break
     
-    # Parse solution if it's a string
-    if isinstance(solution_str_field, str):
-        try:
-            solution_data = json.loads(solution_str_field)
-        except (json.JSONDecodeError, TypeError):
-            solution_data = {}
-    else:
-        solution_data = solution_str_field if solution_str_field is not None else {}
-    
-    # Extract task type
-    task_type = None
-    for key in ground_truth:
-        if 'task_type' in key:
-            task_type = ground_truth[key]
-            break
-    
-    if task_type is None:
-        task_type = 'unknown'
-        
-    # Extract the expected field and value
-    expected_solution = solution_data
-    expected_field = list(expected_solution.keys())[0] if expected_solution else None  # 'input' or 'output'
-    expected_value = expected_solution.get(expected_field) if expected_field else None
-    
+    # Print ground truth information
     print(f"[Ground Truth]")
     print(f"  Task Type: {task_type}")
-    print(f"  Expected Field: {expected_field}")
-    print(f"  Expected Value: {expected_value}")
+    if expected_field:
+        print(f"  Expected Field: {expected_field}")
+        print(f"  Expected Value: {expected_value}")
     
-    # Extract model's answer
-    answer_dict, processed_str = extract_solution(solution_str)
+    # Extract solution from the model's prediction
+    extracted_solution, processed_str = extract_solution(solution_str)
     
     # Print the full model response
     print(f"\n[Full Model Response]")
     print(processed_str)
     
-    # Validate response structure
+    # Validate the response structure
     format_correct = validate_response_structure(processed_str)
-    format_score = format_reward if format_correct else -abs(format_reward)
+    
+    if format_correct:
+        format_score = kwargs.get('format_reward', 1)
+    else:
+        format_score = -kwargs.get('format_reward', 1)
+    
     print(f"\n  Format validation: {'PASS' if format_correct else 'FAIL'}")
     print(f"  Format score: {format_score}")
     
-    # Validate answer content
-    answer_score = 0
-    if format_correct and answer_dict:
-        print(f"\n[Content Validation]")
-        
-        # Check if the expected field exists in the model's answer
-        model_value = answer_dict.get(expected_field) if answer_dict else None
-        
-        if model_value is not None:
-            print(f"  Model answer: {model_value}")
-            
-            # Normalize both expected and model values for comparison
-            normalized_expected = normalize_literal(expected_value)
-            normalized_model = normalize_literal(model_value)
-            
-            # Compare the normalized values
-            if normalized_model == normalized_expected:
-                answer_score = answer_reward
-                print("  Content validation: CORRECT")
-            else:
-                answer_score = -1.5
-                print("  Content validation: INCORRECT")
-                print(f"  Expected: {normalized_expected}")
-                print(f"  Got: {normalized_model}")
-        else:
-            answer_score = -2.0
-            print(f"  [Error] Field '{expected_field}' missing from answer")
-    else:
-        answer_score = -2.0
+    # If format is incorrect, assign a penalty for content
+    if not format_correct or not extracted_solution:
         print("\n[Content Validation] Skipped due to format errors or missing answer")
+        content_score = -kwargs.get('answer_reward', 2.0)
+    else:
+        print("\n[Content Validation]")
+        
+        # Print the extracted answer for debugging
+        extracted_value = None
+        if expected_field and expected_field in extracted_solution:
+            extracted_value = extracted_solution[expected_field]
+            print(f"  Model answer: {extracted_value}")
+        else:
+            print(f"  Model answer: {extracted_solution}")
+        
+        # Compare extracted solution with expected solution
+        is_correct, explanation = compare_solutions(extracted_solution, expected_solution)
+        
+        if is_correct:
+            content_score = kwargs.get('answer_reward', 2.0)
+            print(f"  Content validation: CORRECT")
+        else:
+            content_score = -kwargs.get('answer_reward', 2.0) * 0.75  # Partial penalty for wrong answer
+            print(f"  Content validation: INCORRECT")
+            print(f"  Expected: {expected_value}")
+            print(f"  Got: {extracted_value}")
     
-    total_score = format_score + answer_score
+    # Calculate total score
+    total_score = format_score + content_score
+    
     print("\n" + "-"*80)
-    print(f" Final Score ".center(80, '-'))
+    print(" Final Score ".center(80, '-'))
     print(f"  Format: {format_score}")
-    print(f"  Answer: {answer_score}")
+    print(f"  Answer: {content_score}")
     print(f"  Total: {total_score}")
-    print("="*80 + "\n")
+    print("="*80)
+    print("")
     
     return total_score 

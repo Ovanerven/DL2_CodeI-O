@@ -158,6 +158,15 @@ class vLLMRollout(BaseRollout):
         # parse idx from torch.Tensor to List[List[str]]
         for i in range(batch_size):
             idx_list.append(_pre_process_inputs(self.pad_token_id, idx[i]))
+            
+        # Debug: Print first prompt to verify system message
+        if batch_size > 0 and hasattr(self.inference_engine, 'tokenizer'):
+            # Decode and print the first prompt
+            first_prompt = self.inference_engine.tokenizer.decode(idx_list[0])
+            print("\nDEBUG - First prompt for inference:")
+            print("-" * 50)
+            print(first_prompt)
+            print("-" * 50)
 
         do_sample = prompts.meta_info.get('do_sample', True)
         if not do_sample:
