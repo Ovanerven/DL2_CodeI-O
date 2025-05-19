@@ -39,7 +39,7 @@ Given the following output:
 
 <<<<output>>>>
 
-Can you predict the input without writing any code?
+Can you predict a feasible input without writing any code?
 
 First, think about how to solve this problem. Then, provide your final answer in the following format:
 
@@ -57,15 +57,13 @@ The input and output requirements are as follows:
 
 <<<<io_req>>>>
 
-The function has already been implemented for some inputs. Here are example input-output pairs:
+Given the following input and output pairs:
 
 <<<<examples>>>>
 
-Given the following input:
+Now, can you predict the output for the following input?
 
 <<<<input>>>>
-
-Can you predict the output without writing any code?
 
 First, think about how to solve this problem. Then, provide your final answer in the following format:
 
@@ -382,9 +380,6 @@ def process_dataset(input_file: str, output_file: str, task_types: List[str], pr
 
 def create_logic_rl_records(tasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Convert tasks to Logic-RL format records."""
-    # Define the system prompt
-    system_prompt = "You are a helpful assistant. The assistant first thinks about the reasoning process and then provides the user with the answer. The reasoning process should be enclosed within <think> </think> tags, i.e., <think> reasoning process here </think>. For your final answer, you must format it as a JSON object, exactly as specified in the prompt, and enclose it within <answer> </answer> tags. For example: <answer>{\"output\": value}</answer> or <answer>{\"input\": value}</answer> depending on what's requested. Now the user asks you to solve a complex problem. After thinking through your reasoning, clearly state your answer as a properly formatted JSON object within answer tags."
-    
     logic_rl_records = []
     for task in tasks:
         prompt = task.get('prompt', '')
@@ -393,9 +388,21 @@ def create_logic_rl_records(tasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]
         io_pair = task.get('io_pair', {})
         ref_code_length = task.get('reference_code_length', 0)
         
-        # Create the chat format with system and user messages
+        # Create a system message for the model
+        system_message = (
+            "You are a helpful assistant. The assistant first thinks about the reasoning process "
+            "and then provides the user with the answer. The reasoning process should be "
+            "enclosed within <think> </think> tags, i.e., <think> reasoning process here </think>. "
+            "For your final answer, you must format it as a JSON object, exactly as specified in the prompt, "
+            "and enclose it within <answer> </answer> tags. "
+            "For example: <answer>{\"output\": value}</answer> or <answer>{\"input\": value}</answer> depending on what's requested. "
+            "Now the user asks you to solve a complex problem. After thinking through your reasoning, "
+            "clearly state your answer as a properly formatted JSON object within answer tags."
+        )
+        
+        # Create the chat format expected by Logic-RL
         chat = [
-            {"role": "system", "content": system_prompt},
+            {"role": "system", "content": system_message},
             {"role": "user", "content": prompt}
         ]
         
@@ -481,26 +488,6 @@ def main():
         seed=args.seed,
         max_train_examples=args.max_train_examples
     )
-
-def save_dataset_to_parquet(dataset: List[Dict[str, Any]], output_path: str):
-    """
-    Saves a dataset to a parquet file for use with VERL.
-    """
-    data = {
-        "prompt": [
-            [
-                {"role": "user", "content": example["prompt"]}
-            ]
-            for example in dataset
-        ],
-        "data_source": ["code_io"] * len(dataset),
-        "reward_model": ["reason_io"] * len(dataset),
-        "reference_code_length": [0] * len(dataset),
-    }
-    
-    df = pd.DataFrame(data)
-    df.to_parquet(output_path)
-    print(f"Saved dataset to {output_path}")
 
 if __name__ == "__main__":
     main()
