@@ -388,7 +388,7 @@ def create_logic_rl_records(tasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]
         io_pair = task.get('io_pair', {})
         ref_code_length = task.get('reference_code_length', 0)
         
-        # Create a system message for the model
+        # Create the system prompt that matches KK dataset format
         system_message = (
             "You are a helpful assistant. The assistant first thinks about the reasoning process "
             "and then provides the user with the answer. The reasoning process should be "
@@ -399,20 +399,29 @@ def create_logic_rl_records(tasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]
             "Now the user asks you to solve a complex problem. After thinking through your reasoning, "
             "clearly state your answer as a properly formatted JSON object within answer tags."
         )
-        
-        # Create the chat format expected by Logic-RL
-        chat = [
-            {"role": "system", "content": system_message},
-            {"role": "user", "content": prompt}
-        ]
-        
+
+        # Format exactly like KK dataset with system prompt second
+        combined = (
+            "<|im_start|>user\n"
+            f"{prompt}\n"
+            "<|im_end|>\n"
+            "<|im_start|>system\n"
+            f"{system_message}\n"
+            "<|im_end|>\n"
+            "<|im_start|>assistant\n<think>"
+        )
+
         # Convert nested dictionaries to strings to avoid dataframe issues
         solution_str = json.dumps(solution)
         io_pair_str = json.dumps(io_pair)
-        
-        # Create the Logic-RL record with nested structure
+
         logic_rl_record = {
-            "prompt": chat,
+            "prompt": [
+                {
+                    "role": "user",
+                    "content": combined
+                }
+            ],
             "data_source": "reason_io",
             "reward_model": {
                 "ground_truth": {
