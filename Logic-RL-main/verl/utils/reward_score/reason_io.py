@@ -185,6 +185,62 @@ def validate_response_structure(processed_str: str) -> bool:
 
     return validation_passed
 
+def compare_solutions(extracted_solution: Dict[str, Any], expected_solution: Any) -> Tuple[bool, str]:
+    """
+    Compare the extracted solution with the expected solution.
+    
+    Args:
+        extracted_solution: The solution extracted from the model's response
+        expected_solution: The expected solution (can be dict or string)
+        
+    Returns:
+        Tuple of (is_correct, explanation)
+    """
+    # Handle case when expected_solution is a string
+    if isinstance(expected_solution, str):
+        try:
+            # Try to parse it as JSON
+            expected_solution = json.loads(expected_solution)
+        except json.JSONDecodeError:
+            try:
+                # Try as Python literal
+                expected_solution = ast.literal_eval(expected_solution)
+            except (ValueError, SyntaxError):
+                # Leave as is if can't be parsed
+                pass
+    
+    # If expected_solution is still a string, we need a different comparison strategy
+    if isinstance(expected_solution, str):
+        if "output" in extracted_solution:
+            # Compare string directly with output value
+            model_value = normalize_literal(extracted_solution.get("output"))
+            normalized_expected = normalize_literal(expected_solution)
+            if model_value == normalized_expected:
+                return True, "Model's answer matches expected answer"
+            else:
+                return False, f"Model's answer '{model_value}' does not match expected '{normalized_expected}'"
+        else:
+            return False, f"Expected output field missing from model's answer"
+    
+    # Check if keys match (input vs output) for dictionary case
+    expected_field = list(expected_solution.keys())[0] if expected_solution else None
+    if expected_field not in extracted_solution:
+        return False, f"Expected field '{expected_field}' missing from model's answer"
+    
+    # Get values for comparison
+    expected_value = expected_solution.get(expected_field)
+    model_value = extracted_solution.get(expected_field)
+    
+    # Normalize both values for comparison
+    normalized_expected = normalize_literal(expected_value)
+    normalized_model = normalize_literal(model_value)
+    
+    # Do a direct equality check
+    if normalized_model == normalized_expected:
+        return True, "Model's answer matches expected answer"
+    else:
+        return False, f"Model's answer '{normalized_model}' does not match expected '{normalized_expected}'"
+
 def compute_score(
     solution_str: str, ground_truth: dict, 
     format_reward: int = 1, 
