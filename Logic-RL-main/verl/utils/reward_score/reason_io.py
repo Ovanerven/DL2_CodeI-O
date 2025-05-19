@@ -34,11 +34,11 @@ def extract_json_answer(s: str) -> Optional[Dict[str, Any]]:
     Pulls out the JSON-like blob inside <answer>…</answer> (or <answer>…<answer>)
     and returns it as a Python object, using json.loads first, then ast.literal_eval.
     """
-    # Find all answer blocks - try different pattern variations
+    # match either {...} or [...] content
     patterns = [
-        r'<answer>\s*(\{[\s\S]*?\})\s*</answer>',  # Standard closing tag
-        r'<answer>\s*(\{[\s\S]*?\})\s*<answer>',   # Repeated opening tag (typo)
-        r'<answer>\s*(\{[\s\S]*?\})\s*$'           # Tag at end without closing
+        r'<answer>\s*([\{\[][\\s\\S]*?[\}\]])\s*</answer>',
+        r'<answer>\s*([\{\[][\\s\\S]*?[\}\]])\s*<answer>',
+        r'<answer>\s*([\{\[][\\s\\S]*?[\}\]])\s*$',
     ]
     
     for pattern in patterns:
@@ -85,43 +85,23 @@ def extract_solution(solution_str: str) -> Tuple[Dict[str, Any], str]:
     # Try to find content within <answer> tags
     answer_content = None
     
-    # Look for <answer> and </answer> tags
-    answer_start = processed_str.find("<answer>")
-    answer_end = processed_str.find("</answer>")
+    # locate the last <answer>…</answer> pair
+    answer_start = processed_str.rfind("<answer>")
+    answer_end = processed_str.rfind("</answer>")
     
     if answer_start != -1 and answer_end != -1 and answer_start < answer_end:
         answer_content = processed_str[answer_start + len("<answer>"):answer_end].strip()
-        
         # Try to parse JSON content
+        # First try strict JSON (handles objects *and* arrays)
         try:
-            # First try standard JSON parsing
             result = json.loads(answer_content)
         except json.JSONDecodeError:
+            # Fall back to Python literal_eval for any valid Python literal
             try:
-                # Replace Python expressions with valid JSON
-                answer_content = re.sub(r'(\d+)\s*\*\*\s*(\d+)', 
-                                       lambda m: str(int(m.group(1)) ** int(m.group(2))), 
-                                       answer_content)
-                # Remove any trailing commas in objects or arrays
-                answer_content = re.sub(r',\s*}', '}', answer_content)
-                answer_content = re.sub(r',\s*]', ']', answer_content)
-                # Fix unquoted keys
-                answer_content = re.sub(r'([{,])\s*(\w+)\s*:', r'\1"\2":', answer_content)
-                # Try parsing again
-                result = json.loads(answer_content)
-            except:
-                # If still failing, try ast.literal_eval with safety checks
-                try:
-                    # Only process if content is reasonably sized to avoid memory issues
-                    if len(answer_content) < 1000:
-                        result = ast.literal_eval(answer_content)
-                    else:
-                        print(f"Answer content too large for ast.literal_eval: {len(answer_content)} chars")
-                        return {}, processed_str
-                except:
-                    # Return empty solution if all parsing attempts fail
-                    print(f"Failed to parse answer content: {answer_content[:100]}...")
-                    return {}, processed_str
+                result = ast.literal_eval(answer_content)
+            except Exception:
+                print(f"Failed to parse answer content: {answer_content[:100]}…")
+                return {}, processed_str
     else:
         # Could not find answer tags
         return {}, processed_str
