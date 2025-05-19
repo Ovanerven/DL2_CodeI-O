@@ -167,7 +167,8 @@ def get_expected_field_and_value(task_type: str, io_pair: Dict[str, Any]) -> tup
 
 def process_dataset(input_file: str, output_file: str, task_types: List[str], preview_mode: bool = False, 
                    logic_rl_format: bool = False, split_dataset: bool = False, 
-                   train_ratio: float = 0.85, seed: int = 42, max_train_examples: int = None) -> None:
+                   train_ratio: float = 0.85, seed: int = 42, max_train_examples: int = None,
+                   shuffle_train: bool = False) -> None:
     """Process the dataset to create a balanced set of reasoning tasks.
     
     Args:
@@ -180,6 +181,7 @@ def process_dataset(input_file: str, output_file: str, task_types: List[str], pr
         train_ratio: Ratio of training data (0.85 means 85% train, 15% validation)
         seed: Random seed for reproducibility
         max_train_examples: Maximum number of examples in the training set (validation examples will be added on top of this)
+        shuffle_train: If True, shuffle training data; otherwise maintain order
     """
     try:
         # Set random seed for reproducibility
@@ -230,6 +232,11 @@ def process_dataset(input_file: str, output_file: str, task_types: List[str], pr
         else:
             # Add task type to each record in a round-robin fashion
             valid_records = add_task_type(valid_records, task_types)
+            
+            # Shuffle records if requested
+            if shuffle_train:
+                random.shuffle(valid_records)
+                print(f"Shuffled records as requested")
         
         # Create reasoning tasks
         tasks = []
@@ -293,12 +300,26 @@ def process_dataset(input_file: str, output_file: str, task_types: List[str], pr
                     train_tasks = tasks[:train_size]
                     val_tasks = tasks[train_size:total_examples]
                     
+                    # Always shuffle validation
+                    random.shuffle(val_tasks)
+                    
+                    # Shuffle train if requested
+                    if shuffle_train:
+                        random.shuffle(train_tasks)
+                    
                     print(f"Using {len(train_tasks)} examples for training and {len(val_tasks)} for validation")
             else:
                 # Use the original train_ratio on all examples
                 train_size = int(len(tasks) * train_ratio)
                 train_tasks = tasks[:train_size]
                 val_tasks = tasks[train_size:]
+                
+                # Always shuffle validation
+                random.shuffle(val_tasks)
+                
+                # Shuffle train if requested
+                if shuffle_train:
+                    random.shuffle(train_tasks)
             
             print(f"Split dataset into {len(train_tasks)} training samples and {len(val_tasks)} validation samples")
             
@@ -344,6 +365,11 @@ def process_dataset(input_file: str, output_file: str, task_types: List[str], pr
                 random.shuffle(tasks)
                 tasks = tasks[:max_train_examples]
                 print(f"Limited dataset to {len(tasks)} examples as specified")
+                
+            # Shuffle if requested and no split
+            if shuffle_train and not preview_mode:
+                random.shuffle(tasks)
+                print("Shuffled final task list as requested")
             
             # Save the processed dataset in the appropriate format (no split)
             if logic_rl_format:
@@ -451,6 +477,7 @@ def main():
     parser.add_argument('--split', action='store_true', help='Split the dataset into train and validation sets')
     parser.add_argument('--train_ratio', type=float, default=0.85, help='Ratio of training data (0.85 means 85% train, 15% validation)')
     parser.add_argument('--max_train_examples', type=int, default=None, help='Maximum number of examples in the training set (validation examples will be added on top of this)')
+    parser.add_argument('--shuffle_train', action='store_true', help='Shuffle training data instead of ordering by code length')
     
     args = parser.parse_args()
     
@@ -495,7 +522,8 @@ def main():
         split_dataset=args.split,
         train_ratio=args.train_ratio,
         seed=args.seed,
-        max_train_examples=args.max_train_examples
+        max_train_examples=args.max_train_examples,
+        shuffle_train=args.shuffle_train
     )
 
 if __name__ == "__main__":

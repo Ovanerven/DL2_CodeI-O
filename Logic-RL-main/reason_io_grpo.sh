@@ -1,25 +1,8 @@
-#!/bin/bash
 set -x
-
-# Replace with your model path
 MODEL_PATH=Qwen/Qwen2.5-3B-Instruct
-
-# Export environment variable for XFormers attention backend (optional, but can improve performance)
 export VLLM_ATTENTION_BACKEND=XFORMERS
 
 timestamp=$(date +"%Y-%m-%d_%H-%M-%S")
-
-# Ensure the data directory exists
-mkdir -p data/reason_io
-# Ensure the logs directory exists
-mkdir -p logs/reasonio
-
-# Define the system prompt (with double escaping for JSON in bash)
-SYSTEM_PROMPT="You are a helpful assistant. The assistant first thinks about the reasoning process and then provides the user with the answer. The reasoning process should be enclosed within <think> </think> tags, i.e., <think> reasoning process here </think>. For your final answer, you must format it as a JSON object, exactly as specified in the prompt, and enclose it within <answer> </answer> tags. For example: <answer>{\\\"output\\\": value}</answer> or <answer>{\\\"input\\\": value}</answer> depending on what's requested. When formatting your JSON output, never use Python expressions like 10**10 (use 10000000000 instead). Now the user asks you to solve a complex problem. After thinking through your reasoning, clearly state your answer as a properly formatted JSON object within answer tags."
-
-# Print the system prompt for verification
-echo "System prompt:"
-echo "$SYSTEM_PROMPT"
 
 # Run the PPO training with memory-optimized settings
 python3 -m verl.trainer.main_ppo \
@@ -45,7 +28,7 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.rollout.log_prob_micro_batch_size=160 \
     actor_rollout_ref.rollout.tensor_model_parallel_size=1 \
     actor_rollout_ref.rollout.name=vllm \
-    actor_rollout_ref.rollout.gpu_memory_utilization=0.7 \
+    actor_rollout_ref.rollout.gpu_memory_utilization=0.6 \
     actor_rollout_ref.rollout.n=2 \
     actor_rollout_ref.rollout.temperature=0.7 \
     actor_rollout_ref.ref.log_prob_micro_batch_size=160 \
