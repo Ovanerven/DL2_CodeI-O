@@ -218,7 +218,7 @@ def process_dataset(input_file: str, output_file: str, task_types: List[str], pr
                     remaining_types.remove(record_type)
             
             # Fill the rest with any valid records
-            remaining = 5 - len(sample_records)
+            remaining = 100 - len(sample_records)
             if remaining > 0:
                 # Get the next few records
                 for record in valid_records[len(sample_records):len(sample_records) + remaining]:
