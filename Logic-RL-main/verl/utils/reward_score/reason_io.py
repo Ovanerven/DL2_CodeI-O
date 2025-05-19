@@ -155,7 +155,7 @@ def validate_response_structure(processed_str: str) -> bool:
 
 def compute_score(solution_str: str, ground_truth: Dict[str, Any], 
                  format_reward: int = 1,
-                 answer_reward: float = 2.0) -> Tuple[float, Dict[str, Any]]:
+                 answer_reward: float = 2.0) -> float:
     """
     Compute the reward score for the model's response to Reason-IO dataset.
     
@@ -166,21 +166,10 @@ def compute_score(solution_str: str, ground_truth: Dict[str, Any],
         answer_reward: Points awarded/deducted for answer correctness
         
     Returns:
-        Tuple containing:
-        - Total score (sum of format and answer rewards)
-        - Dictionary of metrics for wandb logging
+        Total score (sum of format and answer rewards)
     """
     print("\n" + "="*80)
     print(" Evaluating Reason-IO Response ".center(80, '='))
-    
-    # Initialize metrics dictionary
-    metrics = {
-        'reward/format_score': 0.0,
-        'reward/answer_score': 0.0,
-        'reward/total_score': 0.0,
-        'reward/format_correct': 0.0,
-        'reward/answer_correct': 0.0,
-    }
     
     # Extract solution data from the flattened parquet structure
     # Check for flattened keys first (from parquet)
@@ -211,7 +200,6 @@ def compute_score(solution_str: str, ground_truth: Dict[str, Any],
     
     if task_type is None:
         task_type = 'unknown'
-    metrics['task_type'] = task_type
         
     # Extract the expected field and value
     expected_solution = solution_data
@@ -235,8 +223,6 @@ def compute_score(solution_str: str, ground_truth: Dict[str, Any],
     format_score = format_reward if format_correct else -abs(format_reward)
     print(f"\n  Format validation: {'PASS' if format_correct else 'FAIL'}")
     print(f"  Format score: {format_score}")
-    metrics['reward/format_score'] = format_score
-    metrics['reward/format_correct'] = float(format_correct)
     
     # Validate answer content
     answer_score = 0
@@ -254,30 +240,22 @@ def compute_score(solution_str: str, ground_truth: Dict[str, Any],
             normalized_model = normalize_literal(model_value)
             
             # Compare the normalized values
-            answer_correct = normalized_model == normalized_expected
-            if answer_correct:
-                answer_score = answer_reward
+            if normalized_model == normalized_expected:
+                answer_score = 2
                 print("  Content validation: CORRECT")
             else:
                 answer_score = -1.5
                 print("  Content validation: INCORRECT")
                 print(f"  Expected: {normalized_expected}")
                 print(f"  Got: {normalized_model}")
-            metrics['reward/answer_correct'] = float(answer_correct)
         else:
-            answer_score = -2.0
+            answer_score = -2
             print(f"  [Error] Field '{expected_field}' missing from answer")
-            metrics['reward/answer_correct'] = 0.0
     else:
-        answer_score = -2.0
+        answer_score = -2
         print("\n[Content Validation] Skipped due to format errors or missing answer")
-        metrics['reward/answer_correct'] = 0.0
-    
-    metrics['reward/answer_score'] = answer_score
     
     total_score = format_score + answer_score
-    metrics['reward/total_score'] = total_score
-    
     print("\n" + "-"*80)
     print(f" Final Score ".center(80, '-'))
     print(f"  Format: {format_score}")
@@ -285,4 +263,4 @@ def compute_score(solution_str: str, ground_truth: Dict[str, Any],
     print(f"  Total: {total_score}")
     print("="*80 + "\n")
     
-    return total_score, metrics 
+    return total_score 
