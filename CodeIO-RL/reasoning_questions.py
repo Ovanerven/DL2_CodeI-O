@@ -169,7 +169,7 @@ def get_expected_field_and_value(task_type: str, io_pair: Dict[str, Any]) -> tup
 def process_dataset(input_file: str, output_file: str, task_types: List[str], preview_mode: bool = False, 
                    logic_rl_format: bool = False, split_dataset: bool = False, 
                    train_ratio: float = 0.85, seed: int = 42, max_train_examples: int = None,
-                   shuffle_train: bool = False) -> None:
+                   shuffle_train: bool = False, max_prompt_tokens: int = None) -> None:
     """Process the dataset to create a balanced set of reasoning tasks.
     
     Args:
@@ -183,10 +183,14 @@ def process_dataset(input_file: str, output_file: str, task_types: List[str], pr
         seed: Random seed for reproducibility
         max_train_examples: Maximum number of examples in the training set (validation examples will be added on top of this)
         shuffle_train: If True, shuffle training data; otherwise maintain order
+        max_prompt_tokens: Drop any example whose prompt is longer (in tokens) than this
     """
     try:
         # Set random seed for reproducibility
         random.seed(seed)
+        
+        # Load the Qwen-2.5-3B tokenizer once
+        tok = AutoTokenizer.from_pretrained("Qwen/Qwen2.5-3B-Instruct", trust_remote_code=True)
         
         # Load the input dataset
         with open(input_file, 'r', encoding='utf-8') as f:
@@ -239,14 +243,20 @@ def process_dataset(input_file: str, output_file: str, task_types: List[str], pr
                 random.shuffle(valid_records)
                 print(f"Shuffled records as requested")
         
-        # Create reasoning tasks
+        # Create reasoning tasks (skipping any prompt > max_prompt_tokens)
         tasks = []
         for record in valid_records:
             task_type = record['task_type']
             
             try:
-                # Format the prompt using consistent IO pair selection
+                # Format the prompt
                 prompt, io_pair = format_codeio_prompt(record, task_type)
+                
+                # If the prompt is too long, skip this record entirely
+                if max_prompt_tokens is not None:
+                    tok_ids = tok.encode(prompt, add_special_tokens=False)
+                    if len(tok_ids) > max_prompt_tokens:
+                        continue
                 
                 # Get expected field and value
                 expected_field, expected_value = get_expected_field_and_value(task_type, io_pair)
@@ -267,7 +277,6 @@ def process_dataset(input_file: str, output_file: str, task_types: List[str], pr
                 continue
         
         # Compute max prompt length in tokens
-        tok = AutoTokenizer.from_pretrained("Qwen/Qwen2.5-3B-Instruct", trust_remote_code=True)
         max_toks = max(len(tok.encode(task["prompt"])) for task in tasks)
         print(f"Max prompt length (in tokens): {max_toks}")
         
@@ -484,6 +493,8 @@ def main():
     parser.add_argument('--train_ratio', type=float, default=0.85, help='Ratio of training data (0.85 means 85% train, 15% validation)')
     parser.add_argument('--max_train_examples', type=int, default=None, help='Maximum number of examples in the training set (validation examples will be added on top of this)')
     parser.add_argument('--shuffle_train', action='store_true', help='Shuffle training data instead of ordering by code length')
+    parser.add_argument('--max_prompt_tokens', type=int, default=None,
+                        help='Drop any example whose prompt is longer (in tokens) than this')
     
     args = parser.parse_args()
     
@@ -529,7 +540,8 @@ def main():
         train_ratio=args.train_ratio,
         seed=args.seed,
         max_train_examples=args.max_train_examples,
-        shuffle_train=args.shuffle_train
+        shuffle_train=args.shuffle_train,
+        max_prompt_tokens=args.max_prompt_tokens
     )
 
 if __name__ == "__main__":

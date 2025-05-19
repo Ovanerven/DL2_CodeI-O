@@ -5,7 +5,7 @@
 #SBATCH --gpus=2
 #SBATCH --job-name=ReasonIOPPO
 #SBATCH --ntasks=1
-#SBATCH --time=06:00:00
+#SBATCH --time=18:00:00
 #SBATCH --mem=180000M
 #SBATCH --output=logs/slurm/slurm_reasonio_%A.out
 
@@ -15,7 +15,8 @@ module load Anaconda3/2023.07-2
 
 # Set CUDA options to optimize memory usage
 export CUDA_VISIBLE_DEVICES=0,1
-export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:128
+export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:128,expandable_segments:True
+
 
 # Activate your environment
 source activate logic
