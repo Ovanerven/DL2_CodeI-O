@@ -1,5 +1,5 @@
 set -x
-MODEL_PATH=qwen2.5-instruct-3b
+MODEL_PATH=Qwen/Qwen2.5-3B-Instruct
 export VLLM_ATTENTION_BACKEND=XFORMERS
 
 timestamp=$(date +"%Y-%m-%d_%H-%M-%S")
