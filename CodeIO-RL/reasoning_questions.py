@@ -4,6 +4,7 @@ import os
 import argparse
 import pandas as pd
 from typing import List, Dict, Any
+from transformers import AutoTokenizer
 
 output_pred_template = """You are given a question that requires some input and output variables as follows:
 
@@ -264,6 +265,11 @@ def process_dataset(input_file: str, output_file: str, task_types: List[str], pr
             except Exception as e:
                 print(f"Error processing record: {str(e)}")
                 continue
+        
+        # Compute max prompt length in tokens
+        tok = AutoTokenizer.from_pretrained("Qwen/Qwen2.5-3B-Instruct", trust_remote_code=True)
+        max_toks = max(len(tok.encode(task["prompt"])) for task in tasks)
+        print(f"Max prompt length (in tokens): {max_toks}")
         
         # Split into train and validation sets if requested
         if split_dataset and not preview_mode:
