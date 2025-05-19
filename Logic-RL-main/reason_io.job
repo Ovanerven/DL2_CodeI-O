@@ -5,7 +5,7 @@
 #SBATCH --gpus=2
 #SBATCH --job-name=ReasonIOPPO
 #SBATCH --ntasks=1
-#SBATCH --time=04:00:00
+#SBATCH --time=08:00:00
 #SBATCH --mem=180000M
 #SBATCH --output=logs/slurm/slurm_reasonio_%A.out
 
@@ -20,4 +20,4 @@ export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:128
 # Activate your environment
 source activate logic
 # Run your code
-sh reason_io_grpo.sh 
+sh reason_io_grpo.sh
