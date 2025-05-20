@@ -16,8 +16,8 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.model.path=${MODEL_PATH} \
     actor_rollout_ref.actor.optim.lr=4e-7 \
     actor_rollout_ref.model.use_remove_padding=True \
-    actor_rollout_ref.actor.ppo_mini_batch_size=32 \
-    actor_rollout_ref.actor.ppo_micro_batch_size=16 \
+    actor_rollout_ref.actor.ppo_mini_batch_size=4 \
+    actor_rollout_ref.actor.ppo_micro_batch_size=4 \
     actor_rollout_ref.actor.use_kl_loss=True \
     actor_rollout_ref.actor.kl_loss_coef=0.001 \
     actor_rollout_ref.actor.kl_loss_type=low_var_kl \
@@ -28,7 +28,7 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.rollout.log_prob_micro_batch_size=160 \
     actor_rollout_ref.rollout.tensor_model_parallel_size=1 \
     actor_rollout_ref.rollout.name=vllm \
-    actor_rollout_ref.rollout.gpu_memory_utilization=0.8 \
+    actor_rollout_ref.rollout.gpu_memory_utilization=0.9 \
     actor_rollout_ref.rollout.n=8 \
     actor_rollout_ref.rollout.temperature=0.7 \
     actor_rollout_ref.ref.log_prob_micro_batch_size=160 \
@@ -44,4 +44,4 @@ python3 -m verl.trainer.main_ppo \
     trainer.default_hdfs_dir=null \
     trainer.save_freq=500 \
     trainer.test_freq=10 \
-    trainer.total_epochs=5 $@ 2>&1 | tee logs/reasonio/reason_io_${timestamp}.log
+    trainer.total_epochs=1 $@ 2>&1 | tee logs/reasonio/reason_io_${timestamp}.log
