@@ -1,0 +1,13 @@
+name: qwen-eval
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - pip
+  - pip:
+      - transformers>=4.39.0
+      - datasets>=2.18.0
+      - accelerate
+      - torch>=2.1
+      - tqdm
