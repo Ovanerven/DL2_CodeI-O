@@ -85,10 +85,10 @@ class RewardManager():
 
             # wrap the scorer so that a crash doesn’t kill the job
             try:
-                score = float(compute_score_fn(
+                score = compute_score_fn(
                     solution_str=sequences_str,
                     ground_truth=ground_truth
-                ))
+                )
             except Exception as e:
                 # log it once per bad example
                 print(f"[WARN] reward scoring failed on model output {sequences_str!r}: {e}")
