@@ -20,4 +20,4 @@ export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:128
 # Activate your environment
 source activate logic
 # Run your code
-sh reason_io_grpo_preview.sh
+sh reason_io_grpo_preview_mini8_micro4.sh
