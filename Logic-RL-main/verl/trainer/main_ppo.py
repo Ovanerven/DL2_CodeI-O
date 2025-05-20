@@ -81,7 +81,21 @@ class RewardManager():
             data_source = data_item.non_tensor_batch['data_source']
             compute_score_fn = _select_rm_score_fn(data_source)
 
-            score = compute_score_fn(solution_str=sequences_str, ground_truth=ground_truth)
+            # score = compute_score_fn(solution_str=sequences_str, ground_truth=ground_truth)
+
+            # wrap the scorer so that a crash doesn’t kill the job
+            try:
+                score = float(compute_score_fn(
+                    solution_str=sequences_str,
+                    ground_truth=ground_truth
+                ))
+            except Exception as e:
+                # log it once per bad example
+                print(f"[WARN] reward scoring failed on model output {sequences_str!r}: {e}")
+                # worst‐case reward for Reason-IO is -3.0
+                score = -3.0
+
+                # write the scalar into the last token of the response for example i
             reward_tensor[i, valid_response_length - 1] = score
 
             # if data_source not in already_print_data_sources:

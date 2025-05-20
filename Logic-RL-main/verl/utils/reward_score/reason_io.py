@@ -6,21 +6,32 @@ from typing import Dict, Any, Optional, Tuple
 
 def normalize_literal(s: str):
     """
-    Turn a string like '{"x":1,"y":1}', "{'x':2,'y':1}", '"False"', 'False', etc.
-    into the corresponding Python object: dict, bool, int, etc.
+    Try to parse `s` as JSON first, then as a Python literal.
+    If it’s a dict or scalar, return it directly.
+    If it’s a list/tuple/set, return it as a list.
+    Otherwise fall back to returning the raw string.
     """
+    # fast-path for non-strings
     if not isinstance(s, str):
         return s
-    # Try JSON first
-    try:
-        val = json.loads(s)
-    except (ValueError, json.JSONDecodeError):
+
+    # attempt JSON, then Python literal
+    for parser in (json.loads, ast.literal_eval):
         try:
-            val = ast.literal_eval(s)
-        except (ValueError, SyntaxError):
-            val = s
-    if isinstance(val, str) and val.lower() in ('true', 'false'):
-        return val.lower() == 'true'
+            val = parser(s)
+            break
+        except Exception:
+            continue
+    else:
+        # couldn’t parse—return original string
+        return s
+
+    # normalize container types
+    if isinstance(val, dict):
+        return val
+    if isinstance(val, (list, tuple, set)):
+        return list(val)
+    # scalar (int, float, bool, str, etc.)
     return val
 
 
