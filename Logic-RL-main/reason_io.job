@@ -15,8 +15,7 @@ module load Anaconda3/2023.07-2
 
 # Set CUDA options to optimize memory usage
 export CUDA_VISIBLE_DEVICES=0,1
-export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:128,expandable_segments:True
-
+export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:128
 
 # Activate your environment
 source activate logic
