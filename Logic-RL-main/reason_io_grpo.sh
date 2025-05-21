@@ -44,4 +44,4 @@ python3 -m verl.trainer.main_ppo \
     trainer.default_hdfs_dir=null \
     trainer.save_freq=1000 \
     trainer.test_freq=10 \
-    trainer.total_epochs=1 $@ 2>&1 | tee logs/reasonio/reason_io_${timestamp}.log
+    trainer.total_epochs=5 $@ 2>&1 | tee logs/reasonio/reason_io_${timestamp}.log
