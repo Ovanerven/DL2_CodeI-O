@@ -14,4 +14,4 @@ module load 2023
 module load Anaconda3/2023.07-2
 source activate qwen-eval
 
-srun python evaluate_benchmarks.py --model_path "Logic-RL-main/actor_checkpoints/reason_io_2025-05-20_15-14-49/actor/global_step_250" --datasets humaneval gsm8k winogrande
+srun python evaluate_benchmarks.py --model_path "Logic-RL-main/actor_checkpoints/reason_io_2025-05-20_15-14-49/actor/global_step_250" --datasets humaneval
