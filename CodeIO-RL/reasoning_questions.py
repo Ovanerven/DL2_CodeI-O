@@ -236,7 +236,7 @@ def process_dataset(input_file: str, output_file: str, task_types: List[str], pr
             print(f"Preview mode: selected {len(valid_records)} records")
         else:
             # Add task type to each record in a round-robin fashion
-            valid_records = add_task_type(valid_records, task_types)
+        valid_records = add_task_type(valid_records, task_types)
             
             # Shuffle records if requested
             if shuffle_train:
@@ -399,10 +399,10 @@ def process_dataset(input_file: str, output_file: str, task_types: List[str], pr
                 print(f"Processed dataset saved to {output_file} in Logic-RL format (Parquet)")
             else:
                 # Save as JSONL (original format)
-                with open(output_file, 'w', encoding='utf-8') as f:
-                    for task in tasks:
-                        f.write(json.dumps(task) + '\n')
-                
+        with open(output_file, 'w', encoding='utf-8') as f:
+            for task in tasks:
+                f.write(json.dumps(task) + '\n')
+        
                 print(f"Processed dataset saved to {output_file} in JSONL format")
         
         # Print statistics

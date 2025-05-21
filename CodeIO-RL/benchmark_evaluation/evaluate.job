@@ -5,7 +5,7 @@
 #SBATCH --gpus=1
 #SBATCH --job-name=Evaluate
 #SBATCH --ntasks=1
-#SBATCH --time=01:00:00
+#SBATCH --time=02:00:00
 #SBATCH --mem=32000M
 #SBATCH --output=logs/eval_%A.out
 
@@ -14,4 +14,4 @@ module load 2023
 module load Anaconda3/2023.07-2
 source activate qwen-eval
 
-srun python evaluate_benchmarks.py --model_path "Logic-RL/qwen2.5-instruct-3b" --datasets humaneval
+srun python evaluate_benchmarks.py --model_path "Logic-RL-main/actor_checkpoints/reason_io_2025-05-20_15-14-49/actor/global_step_250" --datasets humaneval gsm8k winogrande
