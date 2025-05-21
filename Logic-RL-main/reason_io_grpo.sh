@@ -42,6 +42,6 @@ python3 -m verl.trainer.main_ppo \
     trainer.nnodes=1 \
     trainer.default_local_dir=actor_checkpoints/reason_io_${timestamp} \
     trainer.default_hdfs_dir=null \
-    trainer.save_freq=500 \
+    trainer.save_freq=420 \
     trainer.test_freq=10 \
     trainer.total_epochs=5 $@ 2>&1 | tee logs/reasonio/reason_io_${timestamp}.log
