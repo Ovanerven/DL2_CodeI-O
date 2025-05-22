@@ -158,6 +158,16 @@ def evaluate_aime(model, tokenizer):
         match = re.search(r"[-+]?\d+", decoded)
         pred = match.group(0) if match else None
 
+        print("\n" + "="*80)
+        print(f"PROBLEM: {problem}")
+        print("-"*80)
+        print(f"MODEL RESPONSE: {decoded}")
+        print("-"*80)
+        print(f"EXTRACTED ANSWER: {pred}")
+        print(f"GROUND TRUTH: {gt_answer}")
+        print(f"CORRECT: {pred == gt_answer}")
+        print("="*80)
+
         if pred == gt_answer:
             correct += 1
 

@@ -17,4 +17,9 @@ source activate qwen-eval
 echo "==============================================="
 echo "Evaluating ORIGINAL Qwen 2.5 model"
 echo "==============================================="
-srun python evaluate_benchmarks.py --model_path "Qwen/Qwen2.5-3B-Instruct" --datasets amc aime
+srun python evaluate_benchmarks.py --model_path "qwen2.5-instruct-3b" --datasets amc aime
+
+echo "==============================================="
+echo "Evaluating FINE-TUNED Qwen 2.5 model"
+echo "==============================================="
+srun python evaluate_benchmarks.py --model_path "/gpfs/home6/scur2665/DL2_CodeI-O/Logic-RL-main/actor_checkpoints/reason_io_2025-05-21_13-07-34/actor/global_step_1250" --datasets aime
