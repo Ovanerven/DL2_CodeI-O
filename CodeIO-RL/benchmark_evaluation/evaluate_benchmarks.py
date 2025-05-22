@@ -129,10 +129,79 @@ def evaluate_humaneval(model, tokenizer):
     print(f"[HumanEval] Accuracy = {acc:.3%}")
 
 
+def evaluate_aime(model, tokenizer):
+    """
+    Evaluate on the AIME subset (AIME I & II) of the E2H-AMC benchmark.
+    """
+    print("Evaluating AIME...")
+    # load the full AMC/AIME collection and pick out AIME problems
+    ds = load_dataset(
+        "furonghuang-lab/Easy2Hard-Bench",
+        "E2H-AMC",
+        split="eval"
+    )
+
+    aime_ds = ds.filter(lambda x: "AIME" in x["contest"])
+    correct = 0
+
+    for item in tqdm(aime_ds):
+        problem = item["problem"]
+        gt_answer = str(item["answer"])
+
+        # prompt with chain-of-thought
+        prompt = f"Q: {problem}\nA: Let's think step-by-step.\n"
+        inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+        output = model.generate(**inputs, max_new_tokens=64, temperature=0.3)
+        decoded = tokenizer.decode(output[0], skip_special_tokens=True)
+
+        # extract the first integer seen
+        match = re.search(r"[-+]?\d+", decoded)
+        pred = match.group(0) if match else None
+
+        if pred == gt_answer:
+            correct += 1
+
+    acc = correct / len(aime_ds)
+    print(f"[AIME] Accuracy = {acc:.3%}")
+
+
+def evaluate_amc(model, tokenizer):
+    """
+    Evaluate on the AMC subset (all contests starting with 'AMC') of the E2H-AMC benchmark.
+    """
+    print("Evaluating AMC...")
+    ds = load_dataset(
+        "furonghuang-lab/Easy2Hard-Bench",
+        "E2H-AMC",
+        split="eval"
+    )
+
+    amc_ds = ds.filter(lambda x: x["contest"].startswith("AMC"))
+    correct = 0
+
+    for item in tqdm(amc_ds):
+        problem = item["problem"]
+        gt_answer = str(item["answer"])
+
+        prompt = f"Q: {problem}\nA: Let's think step-by-step.\n"
+        inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+        output = model.generate(**inputs, max_new_tokens=64, temperature=0.3)
+        decoded = tokenizer.decode(output[0], skip_special_tokens=True)
+
+        match = re.search(r"[-+]?\d+", decoded)
+        pred = match.group(0) if match else None
+
+        if pred == gt_answer:
+            correct += 1
+
+    acc = correct / len(amc_ds)
+    print(f"[AMC] Accuracy = {acc:.3%}")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_path", type=str, required=True)
-    parser.add_argument("--datasets", nargs="+", choices=["gsm8k", "winogrande", "humaneval"], required=True)
+    parser.add_argument("--datasets", nargs="+", choices=["gsm8k", "winogrande", "humaneval", "amc", "aime"], required=True)
     args = parser.parse_args()
 
     tokenizer, model = load_model(args.model_path)
@@ -145,6 +214,12 @@ def main():
 
     if "humaneval" in args.datasets:
         evaluate_humaneval(model, tokenizer)
+
+    if "amc" in args.datasets:
+        evaluate_amc(model, tokenizer)
+
+    if "aime" in args.datasets:
+        evaluate_aime(model, tokenizer)
 
 
 if __name__ == "__main__":
