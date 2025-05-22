@@ -5,7 +5,7 @@
 #SBATCH --gpus=2
 #SBATCH --job-name=ReasonIO
 #SBATCH --ntasks=1
-#SBATCH --time=18:00:00
+#SBATCH --time=10:00:00
 #SBATCH --mem=180000M
 #SBATCH --output=logs/slurm/slurm_reasonio_%A.out
 
