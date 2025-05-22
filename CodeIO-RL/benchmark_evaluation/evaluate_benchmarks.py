@@ -154,9 +154,19 @@ def evaluate_aime(model, tokenizer):
         output = model.generate(**inputs, max_new_tokens=4096, temperature=0.3)
         decoded = tokenizer.decode(output[0], skip_special_tokens=True)
 
-        # extract the first integer seen
-        match = re.search(r"[-+]?\d+", decoded)
-        pred = match.group(0) if match else None
+        # Try to extract the answer from boxed notation first
+        boxed_match = re.search(r"\\boxed{([-+]?\d+)}", decoded)
+        if boxed_match:
+            pred = boxed_match.group(1)
+        else:
+            # Try to find answer after "the answer is" or similar phrases
+            answer_phrase_match = re.search(r"(?:the\s+)?(?:answer|result|final\s+answer)\s+is\s+([-+]?\d+)", decoded, re.IGNORECASE)
+            if answer_phrase_match:
+                pred = answer_phrase_match.group(1)
+            else:
+                # Fall back to the last number in the text
+                all_numbers = re.findall(r"[-+]?\d+", decoded)
+                pred = all_numbers[-1] if all_numbers else None
 
         print("\n" + "="*80)
         print(f"PROBLEM: {problem}")
@@ -198,8 +208,19 @@ def evaluate_amc(model, tokenizer):
         output = model.generate(**inputs, max_new_tokens=4096, temperature=0.3)
         decoded = tokenizer.decode(output[0], skip_special_tokens=True)
 
-        match = re.search(r"[-+]?\d+", decoded)
-        pred = match.group(0) if match else None
+        # Try to extract the answer from boxed notation first
+        boxed_match = re.search(r"\\boxed{([-+]?\d+)}", decoded)
+        if boxed_match:
+            pred = boxed_match.group(1)
+        else:
+            # Try to find answer after "the answer is" or similar phrases
+            answer_phrase_match = re.search(r"(?:the\s+)?(?:answer|result|final\s+answer)\s+is\s+([-+]?\d+)", decoded, re.IGNORECASE)
+            if answer_phrase_match:
+                pred = answer_phrase_match.group(1)
+            else:
+                # Fall back to the last number in the text
+                all_numbers = re.findall(r"[-+]?\d+", decoded)
+                pred = all_numbers[-1] if all_numbers else None
 
         if pred == gt_answer:
             correct += 1
