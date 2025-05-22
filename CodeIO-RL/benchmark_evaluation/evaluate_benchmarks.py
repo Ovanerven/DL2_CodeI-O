@@ -151,7 +151,7 @@ def evaluate_aime(model, tokenizer):
         # prompt with chain-of-thought
         prompt = f"Q: {problem}\nA: Let's think step-by-step.\n"
         inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
-        output = model.generate(**inputs, max_new_tokens=64, temperature=0.3)
+        output = model.generate(**inputs, max_new_tokens=4096, temperature=0.3)
         decoded = tokenizer.decode(output[0], skip_special_tokens=True)
 
         # extract the first integer seen
@@ -195,7 +195,7 @@ def evaluate_amc(model, tokenizer):
 
         prompt = f"Q: {problem}\nA: Let's think step-by-step.\n"
         inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
-        output = model.generate(**inputs, max_new_tokens=64, temperature=0.3)
+        output = model.generate(**inputs, max_new_tokens=4096, temperature=0.3)
         decoded = tokenizer.decode(output[0], skip_special_tokens=True)
 
         match = re.search(r"[-+]?\d+", decoded)

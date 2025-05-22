@@ -20,7 +20,7 @@ Given the following input:
 
 Can you predict the output without writing any code?
 
-First, think about how to solve this problem. Then, provide your final answer in the following format:
+First, think step-by-step about how to solve this problem. Then, provide your final answer in the following format:
 
 <answer>{"output": <your output>}</answer>
 
@@ -42,7 +42,7 @@ Given the following output:
 
 Can you predict a feasible input without writing any code?
 
-First, think about how to solve this problem. Then, provide your final answer in the following format:
+First, think step-by-step about how to solve this problem. Then, provide your final answer in the following format:
 
 <answer>{"input": <your input>}</answer>
 
@@ -66,7 +66,7 @@ Now, can you predict the output for the following input?
 
 <<<<input>>>>
 
-First, think about how to solve this problem. Then, provide your final answer in the following format:
+First, think step-by-step about how to solve this problem. Then, provide your final answer in the following format:
 
 <answer>{"output": <your output>}</answer>
 
@@ -403,7 +403,7 @@ def process_dataset(input_file: str, output_file: str, task_types: List[str], pr
                     for task in tasks:
                         f.write(json.dumps(task) + '\n')
                 
-                        print(f"Processed dataset saved to {output_file} in JSONL format")
+                print(f"Processed dataset saved to {output_file} in JSONL format")
         
         # Print statistics
         task_types_count = {t: 0 for t in ['deductive', 'abductive', 'inductive']}
@@ -429,25 +429,26 @@ def create_logic_rl_records(tasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]
         io_pair = task.get('io_pair', {})
         ref_code_length = task.get('reference_code_length', 0)
         
-        # Create the system prompt that matches KK dataset format
+        # Create the system prompt that matches KK dataset format,
+        # **but prepend a COT directive** and then put it *before* the user block.
         system_message = (
             "You are a helpful assistant. The assistant first thinks about the reasoning process "
             "and then provides the user with the answer. The reasoning process should be "
             "enclosed within <think> </think> tags, i.e., <think> reasoning process here </think>. "
-            "For your final answer, you must format it as a JSON object, exactly as specified in the prompt, "
+            "For your final answer, you must format it as a JSON object exactly as specified in the prompt "
             "and enclose it within <answer> </answer> tags. "
             "For example: <answer>{\"output\": value}</answer> or <answer>{\"input\": value}</answer> depending on what's requested. "
             "Now the user asks you to solve a complex problem. After thinking through your reasoning, "
             "clearly state your answer as a properly formatted JSON object within answer tags."
         )
 
-        # Format exactly like KK dataset with system prompt second
+        # Format ChatML so that system comes *before* user, then assistant with <think>
         combined = (
-            "<|im_start|>user\n"
-            f"{prompt}\n"
-            "<|im_end|>\n"
             "<|im_start|>system\n"
             f"{system_message}\n"
+            "<|im_end|>\n"
+            "<|im_start|>user\n"
+            f"{prompt}\n"
             "<|im_end|>\n"
             "<|im_start|>assistant\n<think>"
         )
