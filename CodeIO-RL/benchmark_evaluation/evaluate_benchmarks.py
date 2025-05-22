@@ -149,7 +149,7 @@ def evaluate_aime(model, tokenizer):
         gt_answer = str(item["answer"])
 
         # prompt with chain-of-thought
-        prompt = f"Q: {problem}\nA: Let's think step-by-step.\n"
+        prompt = f"Q: {problem}\nA: Please reason step by step, and put your final answer within \\boxed{{}}.\n"
         inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
         output = model.generate(**inputs, max_new_tokens=4096, temperature=0.3)
         decoded = tokenizer.decode(output[0], skip_special_tokens=True)
@@ -203,7 +203,7 @@ def evaluate_amc(model, tokenizer):
         problem = item["problem"]
         gt_answer = str(item["answer"])
 
-        prompt = f"Q: {problem}\nA: Let's think step-by-step.\n"
+        prompt = f"Q: {problem}\nA: Please reason step by step, and put your final answer within \\boxed{{}}.\n"
         inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
         output = model.generate(**inputs, max_new_tokens=4096, temperature=0.3)
         decoded = tokenizer.decode(output[0], skip_special_tokens=True)
