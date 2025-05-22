@@ -19,7 +19,5 @@ export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:128
 
 # Activate your environment
 source activate logic
-# Add explicit PYTHONPATH to include conda environment's site-packages
-export PYTHONPATH=$CONDA_PREFIX/lib/python3.9/site-packages:$PYTHONPATH
 # Run your code
 sh reason_io_grpo_cot.sh
