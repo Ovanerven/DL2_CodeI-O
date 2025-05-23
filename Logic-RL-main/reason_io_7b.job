@@ -5,8 +5,7 @@
 #SBATCH --gpus=4
 #SBATCH --job-name=ReasonIO
 #SBATCH --ntasks=1
-#SBATCH --time=10:00:00
-#SBATCH --mem=400000M
+#SBATCH --time=20:00:00
 #SBATCH --output=logs/slurm/slurm_reasonio_%A.out
 
 module purge
