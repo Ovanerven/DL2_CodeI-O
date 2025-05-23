@@ -1,257 +1,143 @@
 import argparse
-import torch
+import json
 import re
-import os
-import tempfile
+import time
 from tqdm import tqdm
-import subprocess
-from transformers import AutoTokenizer, AutoModelForCausalLM
 from datasets import load_dataset
-
-def load_model(model_path):
-    tokenizer = AutoTokenizer.from_pretrained(model_path)
-    model = AutoModelForCausalLM.from_pretrained(model_path, torch_dtype=torch.float16).to("cuda")
-    model.eval()
-    return tokenizer, model
+from vllm import LLM, SamplingParams
 
 
-def evaluate_gsm8k(model, tokenizer):
-    print("Evaluating GSM8K...")
-    dataset = load_dataset("gsm8k", "main", split="test")
-    correct = 0
+def load_benchmark(benchmark):
+    if benchmark == "gsm8k":
+        return load_dataset("gsm8k", "main", split="test")
+    elif benchmark == "winogrande":
+        return load_dataset("winogrande", "winogrande_xl", split="validation", trust_remote_code=True)
+    elif benchmark == "humaneval":
+        return load_dataset("openai_humaneval", split="test")
+    else:
+        raise ValueError("Unsupported benchmark")
 
-    for item in tqdm(dataset):
-        question = item["question"]
-        gt_answer = item["answer"]
-        prompt = f"Q: {question}\nA: Let's think step-by-step.\n"
-        inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
-        output = model.generate(**inputs, max_new_tokens=256)
-        decoded = tokenizer.decode(output[0], skip_special_tokens=True)
 
-        match = re.search(  
-            r"(?:the\s+)?(?:answer|result|output)\s+is\s+(-?\d+)", 
-            decoded, 
-            re.IGNORECASE
+def build_prompt(benchmark, sample):
+    if benchmark == "gsm8k":
+        return f"Answer the following math question step by step:\n{sample['question']}"
+    elif benchmark == "winogrande":
+        return (
+            f"Choose the correct option to complete the sentence: {sample['sentence']}\n"
+            f"Option 1: {sample['option1']}\nOption 2: {sample['option2']}"
         )
-
-        if match:
-            pred = match.group(1)
-        else:
-            nums = re.findall(f"[-+]?\d+", decoded)
-            pred = nums[-1] if nums else None # taking the last number as the answer
-        
-        if pred and pred in gt_answer:
-            correct += 1
-
-    acc = correct / len(dataset)
-    print(f"[GSM8K] Accuracy = {acc:.3%}")
-
-
-def evaluate_winogrande(model, tokenizer):
-    print("Evaluating WinoGrande...")
-    dataset = load_dataset("winogrande", "winogrande_xl", split="validation", trust_remote_code=True)
-    correct = 0
-
-    for item in tqdm(dataset):
-        sentence = item["sentence"]
-        opt1 = item["option1"]
-        opt2 = item["option2"]
-        gt_answer = item["answer"] # "1" or "2"
-
-        prompt = (
-            f"{sentence}\n"
-            f"Options:\nA: {opt1}\nB: {opt2}"
-            f"Which option best fits the blank? Answer with A or B:\nAnswer:"
-        )
-
-        # # generate code from prompt
-        inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
-        output = model.generate(**inputs, max_new_tokens=16, temperature=0.3)
-        decoded = tokenizer.decode(output[0], skip_special_tokens=True).lower()
-
-        pred = None
-        if "a" in decoded:
-            pred = "1"
-        elif "b" in decoded:
-            pred = "2"
-
-        if pred == gt_answer:
-            correct += 1
+    elif benchmark == "humaneval":
+        return f"Complete the following Python function:\n\n{sample['prompt']}"
+    else:
+        raise ValueError("Unknown benchmark")
     
-    acc = correct / len(dataset)
-    print(f"[WinoGrande] Accuracy = {acc:.3%}")
+
+def get_answer(benchmark, sample):
+    if benchmark in ["gsm8k", "winogrande"]:
+        return sample["answer"]
+    elif benchmark == "humaneval":
+        return sample["entry_point"]
+    else:
+        raise ValueError("Unknown benchmark")
+    
+
+def extract_numeric_answer(text):
+    numbers = re.findall(r"[-+]?\d*\.\d+|\d+", text)
+    return numbers[-1] if numbers else ""
 
 
-def sanitizeTripleQuotes(code):
-    triple_quotes = ["'''", '"""']
-    for quote in triple_quotes:
-        parts = code.split(quote)
-        if len(parts) % 2 == 1:
-            return quote.join(parts[:-1])
-    return code
+def extract_function_def(response):
+    match = re.search(r"(def [\s\S]+)", response)
+    return match.group(1).strip() if match else ""
 
 
-def safe_execute_test(candidate_code, test_code):
-    try:
-        namespace = {}
-        compiled_code = compile(candidate_code + "\n" + test_code, "<string>", "exec")
-        exec(compiled_code, namespace)
-        return True
-    except Exception as e:
-        print(f"Execution error: {e}")
-        print("Generated code:\n", candidate_code)
-        print("=" * 40)
-        return False
-
-
-def evaluate_humaneval(model, tokenizer):
-    print("Evaluating HumanEval...")
-    dataset = load_dataset("openai_humaneval", split="test")
-    correct = 0
-
-    for item in tqdm(dataset):
-        prompt = item["prompt"]
-        test_case = item["test"]
-
-        # generate code from prompt
-        inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
-        output = model.generate(**inputs, max_new_tokens=256, temperature=0.2)
-        decoded = tokenizer.decode(output[0], skip_special_tokens=True)
-
-        decoded = decoded.strip().split("\n\n")[0].strip()
-        decoded = sanitizeTripleQuotes(decoded)
-
-        success = safe_execute_test(decoded, test_case)
-        if success:
-            correct += 1
-
-    acc = correct / len(dataset)
-    print(f"[HumanEval] Accuracy = {acc:.3%}")
-
-
-def evaluate_aime(model, tokenizer):
-    """
-    Evaluate on the AIME subset (AIME I & II) of the E2H-AMC benchmark.
-    """
-    print("Evaluating AIME...")
-    # load the full AMC/AIME collection and pick out AIME problems
-    ds = load_dataset(
-        "furonghuang-lab/Easy2Hard-Bench",
-        "E2H-AMC",
-        split="eval"
-    )
-
-    aime_ds = ds.filter(lambda x: "AIME" in x["contest"])
-    correct = 0
-
-    for item in tqdm(aime_ds):
-        problem = item["problem"]
-        gt_answer = str(item["answer"])
-
-        # prompt with chain-of-thought
-        prompt = f"Q: {problem}\nA: Please reason step by step, and put your final answer within \\boxed{{}}.\n"
-        inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
-        output = model.generate(**inputs, max_new_tokens=4096, temperature=0.3)
-        decoded = tokenizer.decode(output[0], skip_special_tokens=True)
-
-        # Try to extract the answer from boxed notation first
-        boxed_match = re.search(r"\\boxed{([-+]?\d+)}", decoded)
-        if boxed_match:
-            pred = boxed_match.group(1)
-        else:
-            # Try to find answer after "the answer is" or similar phrases
-            answer_phrase_match = re.search(r"(?:the\s+)?(?:answer|result|final\s+answer)\s+is\s+([-+]?\d+)", decoded, re.IGNORECASE)
-            if answer_phrase_match:
-                pred = answer_phrase_match.group(1)
-            else:
-                # Fall back to the last number in the text
-                all_numbers = re.findall(r"[-+]?\d+", decoded)
-                pred = all_numbers[-1] if all_numbers else None
-
-        print("\n" + "="*80)
-        print(f"PROBLEM: {problem}")
-        print("-"*80)
-        print(f"MODEL RESPONSE: {decoded}")
-        print("-"*80)
-        print(f"EXTRACTED ANSWER: {pred}")
-        print(f"GROUND TRUTH: {gt_answer}")
-        print(f"CORRECT: {pred == gt_answer}")
-        print("="*80)
-
-        if pred == gt_answer:
-            correct += 1
-
-    acc = correct / len(aime_ds)
-    print(f"[AIME] Accuracy = {acc:.3%}")
-
-
-def evaluate_amc(model, tokenizer):
-    """
-    Evaluate on the AMC subset (all contests starting with 'AMC') of the E2H-AMC benchmark.
-    """
-    print("Evaluating AMC...")
-    ds = load_dataset(
-        "furonghuang-lab/Easy2Hard-Bench",
-        "E2H-AMC",
-        split="eval"
-    )
-
-    amc_ds = ds.filter(lambda x: x["contest"].startswith("AMC"))
-    correct = 0
-
-    for item in tqdm(amc_ds):
-        problem = item["problem"]
-        gt_answer = str(item["answer"])
-
-        prompt = f"Q: {problem}\nA: Please reason step by step, and put your final answer within \\boxed{{}}.\n"
-        inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
-        output = model.generate(**inputs, max_new_tokens=4096, temperature=0.3)
-        decoded = tokenizer.decode(output[0], skip_special_tokens=True)
-
-        # Try to extract the answer from boxed notation first
-        boxed_match = re.search(r"\\boxed{([-+]?\d+)}", decoded)
-        if boxed_match:
-            pred = boxed_match.group(1)
-        else:
-            # Try to find answer after "the answer is" or similar phrases
-            answer_phrase_match = re.search(r"(?:the\s+)?(?:answer|result|final\s+answer)\s+is\s+([-+]?\d+)", decoded, re.IGNORECASE)
-            if answer_phrase_match:
-                pred = answer_phrase_match.group(1)
-            else:
-                # Fall back to the last number in the text
-                all_numbers = re.findall(r"[-+]?\d+", decoded)
-                pred = all_numbers[-1] if all_numbers else None
-
-        if pred == gt_answer:
-            correct += 1
-
-    acc = correct / len(amc_ds)
-    print(f"[AMC] Accuracy = {acc:.3%}")
+def function_defined(predicted_code, expected_func):
+    pattern = rf"def\s+{re.escape(expected_func)}\s*\("
+    return bool(re.search(pattern, predicted_code))
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--model_path", type=str, required=True)
-    parser.add_argument("--datasets", nargs="+", choices=["gsm8k", "winogrande", "humaneval", "amc", "aime"], required=True)
+    parser = argparse.ArgumentParser(description="Evaluate benchmarks")
+    parser.add_argument("--model_path", type=str, required=True, help="Path to the model")
+    parser.add_argument("--benchmark", type=str, required=True, choices=["gsm8k", "winogrande", "humaneval"],
+                        help="Benchmark to evaluate")
     args = parser.parse_args()
+    
+    llm = LLM(
+        model=args.model_path,
+        tensor_parallel_size=1,
+        dtype="bfloat16",
+        trust_remote_code=True,
+        max_num_seqs=4,
+        max_model_len=20000
+    )
 
-    tokenizer, model = load_model(args.model_path)
+    sampling_params = SamplingParams(
+        max_tokens=10000,
+        temperature=0.8,
+        top_p=0.95
+    )
 
-    if "gsm8k" in args.datasets:
-        evaluate_gsm8k(model, tokenizer)
+    data = load_benchmark(args.benchmark)
+    tokenizer = llm.get_tokenizer()
 
-    if "winogrande" in args.datasets:
-        evaluate_winogrande(model, tokenizer)
+    correct_cnt = 0
+    total_time = 0
 
-    if "humaneval" in args.datasets:
-        evaluate_humaneval(model, tokenizer)
+    for sample in tqdm(data):
+        prompt = build_prompt(args.benchmark, sample)
+        expected_answer = get_answer(args.benchmark, sample)
 
-    if "amc" in args.datasets:
-        evaluate_amc(model, tokenizer)
+        messages = [
+            {"role": "system", "content": "You are a helpful assistant. Think step-by-step before answering. Enclose your reasoning within the <think> tags and your final answer within the <answer> tags."},
+            {"role": "user", "content": prompt}
+        ]
 
-    if "aime" in args.datasets:
-        evaluate_aime(model, tokenizer)
+        text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
 
+        start = time.time()
+        output = llm.generate([text], sampling_params=sampling_params)
+        time_taken = time.time() - start
+        response = output[0].outputs[0].text.strip()
+
+        # benchmark specific extraction logic
+        if args.benchmark == "gsm8k":
+            prediction = extract_numeric_answer(response)
+            expected_clean = extract_numeric_answer(str(expected_answer))
+            correct = prediction == expected_clean
+
+        elif args.benchmark == "winogrande":
+            prediction = "1" if "option 1" in response.lower() else "2" if "option 2" in response.lower() else ""
+            expected_clean = str(expected_answer).strip()
+            correct = prediction == expected_clean
+
+        elif args.benchmark == "humaneval":
+            # For humaneval, we assume the response is a Python function
+            # and we will execute it to check if it matches the expected answer
+            expected_clean = str(expected_answer).strip()
+            cleaned_response = re.sub(r"<.*?>", "", response)
+            predicted_code = extract_function_def(cleaned_response)
+            try:
+                compile(predicted_code, "<string>", "exec")
+                correct = function_defined(predicted_code, expected_clean)
+            except SyntaxError as e:
+                print(f"Error executing generated code: {e}")
+                correct = False
+
+            prediction = predicted_code
+        
+        else:
+            correct = False
+            prediction = ""
+
+        if correct:
+            correct_cnt += 1
+        total_time += time_taken
+    
+    accuracy = correct_cnt / len(data)
+    print(f"{args.benchmark} accuracy: {accuracy:.4f}")
+    print(f"Average time taken: {total_time / len(data):.4f} seconds")
+    print(f"Total time taken: {total_time:.4f} seconds")
 
 if __name__ == "__main__":
     main()
