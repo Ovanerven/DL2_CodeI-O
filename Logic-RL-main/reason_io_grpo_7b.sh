@@ -7,8 +7,8 @@ timestamp=$(date +"%Y-%m-%d_%H-%M-%S")
 # Run the PPO training with memory-optimized settings
 python3 -m verl.trainer.main_ppo \
     algorithm.adv_estimator=reinforce_plus_plus \
-    data.train_files=data/reason_io/reason_io_dataset_CoT_train.parquet \
-    data.val_files=data/reason_io/reason_io_dataset_CoT_val.parquet \
+    data.train_files=data/reason_io/reason_io_dataset_train.parquet \
+    data.val_files=data/reason_io/reason_io_dataset_val.parquet \
     data.train_batch_size=8 \
     data.val_batch_size=8 \
     data.max_prompt_length=4096 \
@@ -37,11 +37,11 @@ python3 -m verl.trainer.main_ppo \
     trainer.critic_warmup=0 \
     trainer.logger=['wandb'] \
     trainer.project_name='ReasonIO' \
-    trainer.experiment_name="Qwen-3B_ReasonIO_CoT${timestamp}" \
+    trainer.experiment_name="Qwen-3B_ReasonIO_${timestamp}" \
     trainer.n_gpus_per_node=2 \
     trainer.nnodes=1 \
     trainer.default_local_dir=actor_checkpoints/reason_io_${timestamp} \
     trainer.default_hdfs_dir=null \
-    trainer.save_freq=1000 \
+    trainer.save_freq=420 \
     trainer.test_freq=10 \
-    trainer.total_epochs=1 $@ 2>&1 | tee logs/reasonio/reason_io_${timestamp}.log
+    trainer.total_epochs=5 $@ 2>&1 | tee logs/reasonio/reason_io_${timestamp}.log
