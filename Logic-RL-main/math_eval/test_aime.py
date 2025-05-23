@@ -60,8 +60,8 @@ def main():
         top_p=0.95,
     )
 
-    # with open("aime/aime_2021_2024.jsonl", encoding="utf-8") as file:
-    with open("archive/aime/aime_2021_2024.jsonl", encoding="utf-8") as file:
+    with open("aime_2021_2024.jsonl", encoding="utf-8") as file:
+    # with open("archive/aime/aime_2021_2024.jsonl", encoding="utf-8") as file:
         data = [json.loads(line) for line in file.readlines() if line]
     
     cnt = 0

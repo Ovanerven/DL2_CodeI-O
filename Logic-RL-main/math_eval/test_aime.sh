@@ -27,4 +27,4 @@
 # CUDA_VISIBLE_DEVICES=4 python test_aime.py --stage 1 --step 1740 > log/aime/1/1740.log 2>&1 &
 
 # python test_aime.py --model_path "/home/scur2590/DL2_CodeI-O/Logic-RL-main/actor_checkpoints/checkpoint_2025-05-20_15-14-12/actor/global_step_1250" 2>&1 | tee logs/aime.log 
-python test_aime.py --model_path "/home/scur2590/DL2_CodeI-O/Logic-RL-main/qwen2.5-instruct-3b" 2>&1 | tee logs/aime.log 
+python test_aime.py --model_path "/home/scur2590/DL2_CodeI-O/Logic-RL-main/actor_checkpoints/checkpoint_2025-05-20_15-14-12/actor/global_step_1250" 2>&1 | tee logs/aime.log 

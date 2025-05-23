@@ -107,7 +107,7 @@ def main():
     
     acc = cnt / len(data)
     print(f"ACC: {acc}")
-    output_json = f"amc_output_{args.stage}_{args.step}.json"
+    output_json = f"amc_output.json"
     with open(output_json, 'w') as outfile:
         json.dump(results, outfile, indent=4)
 
