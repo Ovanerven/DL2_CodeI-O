@@ -23,7 +23,7 @@ def main():
     parser = argparse.ArgumentParser()
     # parser.add_argument('model', type=str)
     parser.add_argument('--model_path', type=str, required=True)
-    parser.add_argument('--json_path', type=str, required=True)
+    # parser.add_argument('--json_path', type=str, required=True)
     # parser.add_argument('--step', type=int, required=True)
     args = parser.parse_args()
     # print(args.model_path)
