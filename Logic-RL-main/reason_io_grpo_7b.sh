@@ -1,5 +1,5 @@
 set -x
-MODEL_PATH=Qwen/Qwen2.5-3B-Instruct
+MODEL_PATH=Qwen/Qwen2.5-7B-Instruct
 export VLLM_ATTENTION_BACKEND=XFORMERS
 
 timestamp=$(date +"%Y-%m-%d_%H-%M-%S")
@@ -38,10 +38,10 @@ python3 -m verl.trainer.main_ppo \
     trainer.logger=['wandb'] \
     trainer.project_name='ReasonIO' \
     trainer.experiment_name="Qwen-3B_ReasonIO_${timestamp}" \
-    trainer.n_gpus_per_node=2 \
+    trainer.n_gpus_per_node=4 \
     trainer.nnodes=1 \
     trainer.default_local_dir=actor_checkpoints/reason_io_${timestamp} \
     trainer.default_hdfs_dir=null \
     trainer.save_freq=420 \
     trainer.test_freq=10 \
-    trainer.total_epochs=5 $@ 2>&1 | tee logs/reasonio/reason_io_${timestamp}.log
+    trainer.total_epochs=1 $@ 2>&1 | tee logs/reasonio/reason_io_${timestamp}.log
