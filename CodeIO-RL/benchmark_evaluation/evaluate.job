@@ -15,4 +15,4 @@ module load Anaconda3/2023.07-2
 module load CUDA/12.4.0
 source activate qwen-eval
 
-srun python evaluate_benchmarks.py --model_path "Logic-RL/qwen2.5-instruct-3b" --benchmark humaneval
+srun python evaluate_benchmarks.py --model_path "Logic-RL/qwen2.5-instruct-3b" --benchmark gsm8k
