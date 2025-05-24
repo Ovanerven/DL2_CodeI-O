@@ -45,7 +45,7 @@ python3 -m verl.trainer.main_ppo \
     trainer.critic_warmup=0 \
     trainer.logger=['wandb'] \
     trainer.project_name='ReasonIO' \
-    trainer.experiment_name="Qwen-7B_ReasonIO_${timestamp}" \
+    trainer.experiment_name="Qwen-7B-OG_ReasonIO_${timestamp}" \
     trainer.n_gpus_per_node=4 \
     trainer.nnodes=1 \
     trainer.default_local_dir=actor_checkpoints/reason_io_${timestamp} \
