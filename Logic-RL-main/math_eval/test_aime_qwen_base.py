@@ -16,9 +16,9 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import argparse
-from vllm import LLM, SamplingParams
-from datetime import datetime
+# from vllm import LLM, SamplingParams
 from transformers import AutoTokenizer, AutoModelForCausalLM
+from datetime import datetime
 
 def main():
     parser = argparse.ArgumentParser()
@@ -46,33 +46,24 @@ def main():
     # model_path = f"/volume/ailab4sci/models/{model_name}"
     # model_path = "/volume/ailab4sci/ztgao/checkpoints/GRPO_logic_KK/rpp_qwen32b_5ppl_2e-6_16gpu/actor/global_step_120"
 
-    # llm = LLM(
-    #     model=args.model_path,
-    #     tensor_parallel_size=1,
-    #     dtype="bfloat16",
-    #     trust_remote_code=True,
-    #     max_num_seqs=4,
-    #     max_model_len=20000
-    # )
-    
-    tokenizer = AutoTokenizer.from_pretrained(args.model_path)
-    llm = AutoModelForCausalLM.from_pretrained(args.model_path, torch_dtype=torch.float16).to("cuda")
-    llm.eval()
-    
-    sampling_params = SamplingParams(
-        max_tokens=10000,
-        temperature=0.8,
-        top_p=0.95,
+    # Load model and tokenizer from Hugging Face transformers
+    tokenizer = AutoTokenizer.from_pretrained(args.model_path, trust_remote_code=True)
+    model = AutoModelForCausalLM.from_pretrained(
+        args.model_path,
+        device_map="auto",
+        torch_dtype=torch.bfloat16,
+        trust_remote_code=True
     )
-
-    # with open("aime/aime_2021_2024.jsonl", encoding="utf-8") as file:
+    
+    # Read test data
     with open("aime_2021_2024.jsonl", encoding="utf-8") as file:
         data = [json.loads(line) for line in file.readlines() if line]
     
     cnt = 0
     total_time = 0
     results = []
-
+    # step = args.model_path.split('_')[-1] if '_' in args.model_path else 'base'
+    data = data[:5]
     for d in tqdm(data):
         prompt = d["question"]
         messages = [
@@ -80,7 +71,7 @@ def main():
             {"role": "user", "content": prompt}
         ]
         
-        # tokenizer = llm.get_tokenizer()
+        # Apply chat template to format messages
         text = tokenizer.apply_chat_template(
             messages,
             tokenize=False,
@@ -88,16 +79,32 @@ def main():
         )
         
         expected_answer = d['answer']
+        
+        # Generate response
         start_time = time.time()
-        outputs = llm.generate([text], sampling_params)
+        
+        # Tokenize input text
+        inputs = tokenizer(text, return_tensors="pt",  return_attention_mask=True).to(model.device)
+        
+        # Generate output
+        generation_output = model.generate(
+            **inputs,
+            max_new_tokens=10000,
+            temperature=0.8,
+            top_p=0.95,
+            do_sample=True
+        )
+        
+        # Decode output tokens to text
+        response = tokenizer.decode(generation_output[0][inputs.input_ids.shape[1]:], skip_special_tokens=True)
+        
         time_taken = time.time() - start_time
-        response = outputs[0].outputs[0].text.strip()
 
         if '<answer>' in response:
             result = re.split(r'<answer>', response)[1]
         else:
             result = response[len(response) - 30:]
-        
+        print(result)
         correct = expected_answer in result
         
         result = {
@@ -117,7 +124,7 @@ def main():
     
     acc = cnt / len(data)
     print(f"ACC: {acc}")
-    # with open(f"{step}.json", 'w') as outfile:
+    # with open(f"aime.json", 'w') as outfile:
     #     json.dump(results, outfile, indent=4)
 
 if __name__ == "__main__":

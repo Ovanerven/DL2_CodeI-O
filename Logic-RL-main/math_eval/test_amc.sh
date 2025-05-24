@@ -25,4 +25,4 @@
 # CUDA_VISIBLE_DEVICES=2 python test_amc.py --stage 1 --step 1620 > log/amc/1/1620.log 2>&1 &
 # CUDA_VISIBLE_DEVICES=3 python test_amc.py --stage 1 --step 1680 > log/amc/1/1680.log 2>&1 &
 # CUDA_VISIBLE_DEVICES=4 python test_amc.py --stage 1 --step 1740 > log/amc/1/1740.log 2>&1 &
-python test_amc.py --model_path "/home/scur2590/DL2_CodeI-O/Logic-RL-main/actor_checkpoints/checkpoint_2025-05-20_15-14-12/actor/global_step_1250" 2>&1 | tee logs/aime.log 
+python test_amc_qwen_base.py --model_path "/home/scur2590/DL2_CodeI-O/Logic-RL-main/qwen2.5-instruct-3b" 2>&1 | tee logs/aime.log 
