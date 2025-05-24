@@ -22,8 +22,63 @@ from collections import defaultdict
 
 # Import the official ReasonIO evaluation functions
 import sys
-sys.path.append('Logic-RL-main/verl/utils/reward_score')
-from reason_io import extract_json_answer, normalize_literal, extract_solution
+import re
+import json
+import ast
+from typing import Dict, Any, Optional, Tuple
+
+def normalize_literal(s):
+    """
+    Try to parse `s` as JSON first, then as a Python literal.
+    If it's a dict or scalar, return it directly.
+    If it's a list/tuple/set, return it as a list.
+    Otherwise fall back to returning the raw string.
+    """
+    # fast-path for non-strings
+    if not isinstance(s, str):
+        return s
+
+    # attempt JSON, then Python literal
+    for parser in (json.loads, ast.literal_eval):
+        try:
+            val = parser(s)
+            break
+        except Exception:
+            continue
+    else:
+        # couldn't parse—return original string
+        return s
+
+    # normalize container types
+    if isinstance(val, dict):
+        return val
+    if isinstance(val, (list, tuple, set)):
+        return list(val)
+    # scalar (int, float, bool, str, etc.)
+    return val
+
+def extract_json_answer(s: str) -> Optional[Dict[str, Any]]:
+    """
+    Pulls out the JSON-like blob inside <answer>…</answer>
+    """
+    patterns = [
+        r'<answer>\s*(\{[\s\S]*?\})\s*</answer>',
+        r'<answer>\s*(\{[\s\S]*?\})\s*<answer>',
+        r'<answer>\s*(\{[\s\S]*?\})\s*$'
+    ]
+    for pattern in patterns:
+        matches = re.findall(pattern, s, re.IGNORECASE)
+        if matches:
+            valid = [m for m in matches if m.strip() != '{}']
+            blob = valid[-1] if valid else matches[-1]
+            try:
+                return json.loads(blob)
+            except json.JSONDecodeError:
+                try:
+                    return ast.literal_eval(blob)
+                except Exception:
+                    continue
+    return None
 
 def extract_prompt_content(prompt_data):
     """Extract the actual prompt text from the complex prompt structure"""
