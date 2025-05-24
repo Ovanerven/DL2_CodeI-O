@@ -19,4 +19,4 @@ source activate logic
 export HYDRA_FULL_ERROR=1
 
 # Run your code
-sh reason_io_grpo_7b_5epoch.sh
+sh kk_grpo_7b_5epoch.sh
