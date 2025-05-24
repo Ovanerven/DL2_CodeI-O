@@ -25,6 +25,6 @@ MODEL_PATH="/gpfs/home6/scur2665/DL2_CodeI-O/Logic-RL-main/actor_checkpoints/rea
 python math_eval/test_reasonIO.py \
     --model_path ${MODEL_PATH} \
     --data_path data/reason_io/reason_io_dataset_val.parquet \
-    --max_examples 100
+    --print_responses
 
 echo "Evaluation job completed for Step 1250!" 
