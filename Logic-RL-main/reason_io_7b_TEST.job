@@ -1,0 +1,22 @@
+#!/bin/bash
+
+#SBATCH --partition=gpu_h100
+#SBATCH --cpus-per-task=16
+#SBATCH --gpus=4
+#SBATCH --job-name=ReasonIO
+#SBATCH --ntasks=1
+#SBATCH --time=20:00:00
+#SBATCH --output=logs/slurm/slurm_reasonio_%A.out
+#SBATCH --error=logs/slurm/slurm_reasonio_%A.err
+
+module purge
+module load 2023
+module load Anaconda3/2023.07-2
+
+# Activate your environment
+source activate logic
+
+export HYDRA_FULL_ERROR=1
+
+# Run your code
+sh reason_io_grpo_7b_TEST.sh
