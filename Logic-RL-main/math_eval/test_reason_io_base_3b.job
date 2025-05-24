@@ -19,7 +19,7 @@ export CUDA_VISIBLE_DEVICES=0
 source activate logic
 
 # Set model path - Base Qwen2.5-3B model
-MODEL_PATH="Logic-RL/qwen2.5-instruct-3b"
+MODEL_PATH="Qwen/Qwen2.5-3B-Instruct"
 
 # Run the evaluation
 python math_eval/test_reasonIO.py \
