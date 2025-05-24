@@ -15,8 +15,23 @@ module load Anaconda3/2023.07-2
 
 export CUDA_VISIBLE_DEVICES=0,1,2,3
 export PYTORCH_CUDA_ALLOC_CONF="max_split_size_mb:512,garbage_collection_threshold:0.6"
+export CUDA_LAUNCH_BLOCKING=0
+export TOKENIZERS_PARALLELISM=false
+export OMP_NUM_THREADS=4
+export MKL_NUM_THREADS=4
+
+export NCCL_BUFFSIZE=2097152
+export NCCL_P2P_DISABLE=1
+export NCCL_IB_DISABLE=1
+
+export PYTHONUNBUFFERED=1
+export MALLOC_TRIM_THRESHOLD_=100000
+
 
 # Activate your environment
 source activate logic
+
+nvidia-smi --gpu-reset
+
 # Run your code
 sh reason_io_grpo_7b.sh
