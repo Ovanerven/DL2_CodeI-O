@@ -7,8 +7,8 @@ from typing import Dict, Any, Optional, Tuple
 def normalize_literal(s: str):
     """
     Try to parse `s` as JSON first, then as a Python literal.
-    If it’s a dict or scalar, return it directly.
-    If it’s a list/tuple/set, return it as a list.
+    If it's a dict or scalar, return it directly.
+    If it's a list/tuple/set, return it as a list.
     Otherwise fall back to returning the raw string.
     """
     # fast-path for non-strings
@@ -23,7 +23,7 @@ def normalize_literal(s: str):
         except Exception:
             continue
     else:
-        # couldn’t parse—return original string
+        # couldn't parse—return original string
         return s
 
     # normalize container types
@@ -141,6 +141,12 @@ def compute_score(solution_str: str,
         print(f"\n[Content Validation] Model {expected_field}={model_val}")
         norm_exp = normalize_literal(expected_value)
         norm_mod = normalize_literal(model_val)
+        
+        # If both are strings, also normalize trailing whitespace
+        if isinstance(norm_exp, str) and isinstance(norm_mod, str):
+            norm_exp = norm_exp.rstrip()
+            norm_mod = norm_mod.rstrip()
+        
         if norm_mod == norm_exp:
             ans_score = answer_reward
             print("  Content: CORRECT")
