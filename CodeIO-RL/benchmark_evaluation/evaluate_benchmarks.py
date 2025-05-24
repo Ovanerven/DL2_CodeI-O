@@ -18,18 +18,41 @@ def load_benchmark(benchmark):
         raise ValueError("Unsupported benchmark")
 
 
-def build_prompt(benchmark, sample):
+def build_messages(benchmark, sample):
     if benchmark == "gsm8k":
-        return f"Answer the following math question step by step:\n{sample['question']}"
+        return [
+            {"role": "system", "content": (
+                "You are a helpful assistant. Solve the math problem step-by-step. "
+                "Put all intermediate reasoning inside <think> tags. "
+                "Place the final numerical answer only (no units, no punctuation) inside <answer> tags. "
+                "The <answer> tag should contain only the number, like <answer>540</answer>."
+            )},
+            {"role": "user", "content": f"Answer the following math question step by step:\n{sample['question']}"}
+        ]
+
     elif benchmark == "winogrande":
-        return (
-            f"Choose the correct option to complete the sentence: {sample['sentence']}\n"
-            f"Option 1: {sample['option1']}\nOption 2: {sample['option2']}"
-        )
+        return [
+            {"role": "system", "content": (
+                "You are a helpful assistant. Think step-by-step inside the <think> </think> tags. "
+                "Then provide your final choice word-for-word inside the <answer> </answer> tags."
+            )},
+            {"role": "user", "content": (
+                f"Choose the correct option to complete the sentence: {sample['sentence']}\n"
+                f"Option 1: {sample['option1']}\nOption 2: {sample['option2']}"
+            )}
+        ]
+    
     elif benchmark == "humaneval":
-        return f"Complete the following Python function:\n\n{sample['prompt']}"
+        return [
+            {"role": "system", "content": (
+                "You are a helpful coding assistant. Think through the solution inside the <think> </think> tags, "
+                "and place the full function code inside the <answer> </answer> tags. Do not include explanations outside the tags."
+            )},
+            {"role": "user", "content": f"Complete the following Python function:\n\n{sample['prompt']}"}
+        ]
+    
     else:
-        raise ValueError("Unknown benchmark")
+        raise ValueError("Unsupported benchmark")
     
 
 def get_answer(benchmark, sample):
@@ -41,19 +64,36 @@ def get_answer(benchmark, sample):
         raise ValueError("Unknown benchmark")
     
 
-def extract_numeric_answer(text):
-    numbers = re.findall(r"[-+]?\d*\.\d+|\d+", text)
-    return numbers[-1] if numbers else ""
+def extract_gsm8k_answer(response):
+    match = re.search(r"<answer>\s*([$]?\s*\d[\d,]*)\s*</answer>", response, re.IGNORECASE)
+    if match:
+        raw = match.group(1)
+        clean = re.sub(r"[^\d]", "", raw)  # remove everything except digits
+        return clean
+    return ""
 
 
-def extract_function_def(response):
-    match = re.search(r"(def [\s\S]+)", response)
+def extract_winogrande_answer(response, option1, option2):
+    match = re.search(r"<answer>\s*(.*?)\s*</answer>", response, re.IGNORECASE | re.DOTALL)
+    if not match:
+        return ""
+    answer = match.group(1).strip().lower()
+    answer = re.sub(r"option\s*\d:\s*", "", answer).strip()
+    if answer == option1.lower():
+        return "1"
+    elif answer == option2.lower():
+        return "2"
+    return ""
+
+
+def extract_humaneval_answer(response):
+    match = re.search(r"<answer>\s*(.*?)\s*</answer>", response, re.DOTALL | re.IGNORECASE)
     return match.group(1).strip() if match else ""
 
 
-def function_defined(predicted_code, expected_func):
-    pattern = rf"def\s+{re.escape(expected_func)}\s*\("
-    return bool(re.search(pattern, predicted_code))
+def function_defined(code, expected_func):
+    pattern = rf"(?<![a-zA-Z0-9_])def\s+{re.escape(expected_func)}\s*\("
+    return bool(re.search(pattern, code))
 
 
 def main():
@@ -82,19 +122,15 @@ def main():
     tokenizer = llm.get_tokenizer()
 
     correct_cnt = 0
+    curr = 0
     total_time = 0
+    logs = []
 
     for sample in tqdm(data):
-        prompt = build_prompt(args.benchmark, sample)
-        expected_answer = get_answer(args.benchmark, sample)
-
-        messages = [
-            {"role": "system", "content": "You are a helpful assistant. Think step-by-step before answering. Enclose your reasoning within the <think> tags and your final answer within the <answer> tags."},
-            {"role": "user", "content": prompt}
-        ]
-
+        messages = build_messages(args.benchmark, sample)
         text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-
+        expected_answer = get_answer(args.benchmark, sample)
+        
         start = time.time()
         output = llm.generate([text], sampling_params=sampling_params)
         time_taken = time.time() - start
@@ -102,12 +138,15 @@ def main():
 
         # benchmark specific extraction logic
         if args.benchmark == "gsm8k":
-            prediction = extract_numeric_answer(response)
-            expected_clean = extract_numeric_answer(str(expected_answer))
+            prediction = extract_gsm8k_answer(response)
+            match = re.search(r"####\s*(\d+)", str(expected_answer))
+            expected_clean = match.group(1) if match else ""
             correct = prediction == expected_clean
 
         elif args.benchmark == "winogrande":
-            prediction = "1" if "option 1" in response.lower() else "2" if "option 2" in response.lower() else ""
+            option1 = sample["option1"]
+            option2 = sample["option2"]
+            prediction = extract_winogrande_answer(response, option1, option2)
             expected_clean = str(expected_answer).strip()
             correct = prediction == expected_clean
 
@@ -115,8 +154,8 @@ def main():
             # For humaneval, we assume the response is a Python function
             # and we will execute it to check if it matches the expected answer
             expected_clean = str(expected_answer).strip()
-            cleaned_response = re.sub(r"<.*?>", "", response)
-            predicted_code = extract_function_def(cleaned_response)
+            predicted_code = extract_humaneval_answer(response)
+
             try:
                 compile(predicted_code, "<string>", "exec")
                 correct = function_defined(predicted_code, expected_clean)
@@ -130,14 +169,31 @@ def main():
             correct = False
             prediction = ""
 
+        logs.append({
+            "prompt": messages[-1]["content"],
+            "expected_answer": expected_answer,
+            "expected_clean": expected_clean,
+            "response": response,
+            "predicted_answer": prediction,
+            "correct": correct
+        })
+
+        curr += 1
         if correct:
             correct_cnt += 1
+
+        if curr % 100 == 0:
+            print(f"Accuracy after {curr} samples: {correct_cnt / curr:.4f}")
+
         total_time += time_taken
     
     accuracy = correct_cnt / len(data)
     print(f"{args.benchmark} accuracy: {accuracy:.4f}")
     print(f"Average time taken: {total_time / len(data):.4f} seconds")
     print(f"Total time taken: {total_time:.4f} seconds")
+
+    with open(f"benchmark_logs/{args.benchmark}_log.json", "w") as f:
+        json.dump(logs, f, indent=2)
 
 if __name__ == "__main__":
     main()
