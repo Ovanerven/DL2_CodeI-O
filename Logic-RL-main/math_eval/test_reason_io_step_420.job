@@ -1,0 +1,30 @@
+#!/bin/bash
+
+#SBATCH --partition=gpu_h100
+#SBATCH --cpus-per-task=8
+#SBATCH --gpus=1
+#SBATCH --job-name=EvalReasonIO_Step420
+#SBATCH --ntasks=1
+#SBATCH --time=1:00:00
+#SBATCH --output=logs/slurm/slurm_eval_reasonio_step_420_%A.out
+#SBATCH --mem=64G
+
+module purge
+module load 2023
+module load Anaconda3/2023.07-2
+
+export CUDA_VISIBLE_DEVICES=0
+
+# Activate your environment
+source activate logic
+
+# Set model path - Trained model at step 420
+MODEL_PATH="/gpfs/home6/scur2665/DL2_CodeI-O/Logic-RL-main/actor_checkpoints/reason_io_2025-05-21_13-07-34/actor/global_step_420"
+
+# Run the evaluation
+python math_eval/test_reasonIO.py \
+    --model_path ${MODEL_PATH} \
+    --data_path data/reason_io/reason_io_dataset_val.parquet \
+    --max_examples 100
+
+echo "Evaluation job completed for Step 420!" 

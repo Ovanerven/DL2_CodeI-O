@@ -16,5 +16,7 @@ module load Anaconda3/2023.07-2
 # Activate your environment
 source activate logic
 
+export HYDRA_FULL_ERROR=1
+
 # Run your code
 sh reason_io_grpo_7b.sh
