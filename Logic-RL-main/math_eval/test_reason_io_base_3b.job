@@ -25,6 +25,7 @@ MODEL_PATH="Logic-RL/qwen2.5-instruct-3b"
 python math_eval/test_reasonIO.py \
     --model_path ${MODEL_PATH} \
     --data_path data/reason_io/reason_io_dataset_val.parquet \
-    --max_examples 100
+    --max_examples 100 \
+    --print_responses
 
 echo "Evaluation job completed for Base Qwen2.5-3B!" 
