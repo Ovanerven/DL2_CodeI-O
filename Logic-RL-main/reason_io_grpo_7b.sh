@@ -1,4 +1,14 @@
 set -x
+
+# Environment variables
+export VLLM_ATTENTION_BACKEND=XFORMERS
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+export MKL_THREADING_LAYER=GNU
+export TORCH_CUDA_ALLOW_TF32=1
+export HYDRA_FULL_ERROR=1
+# export HF_ENDPOINT=https://hf-mirror.com
+export CUDA_VISIBLE_DEVICES=0,1,2,3
+
 MODEL_PATH=Qwen/Qwen2.5-7B-Instruct
 export VLLM_ATTENTION_BACKEND=XFORMERS
 
