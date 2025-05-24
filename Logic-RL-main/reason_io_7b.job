@@ -14,7 +14,7 @@ module load 2023
 module load Anaconda3/2023.07-2
 
 export CUDA_VISIBLE_DEVICES=0,1,2,3
-export PYTORCH_CUDA_ALLOC_CONF="max_split_size_mb:512,garbage_collection_threshold:0.6,expandable_segments:True"
+export PYTORCH_CUDA_ALLOC_CONF="max_split_size_mb:512,garbage_collection_threshold:0.6"
 
 # Activate your environment
 source activate logic
