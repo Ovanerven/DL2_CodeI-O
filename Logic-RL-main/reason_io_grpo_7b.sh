@@ -6,7 +6,6 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 export MKL_THREADING_LAYER=GNU
 export TORCH_CUDA_ALLOW_TF32=1
 export HYDRA_FULL_ERROR=1
-# export HF_ENDPOINT=https://hf-mirror.com
 export CUDA_VISIBLE_DEVICES=0,1,2,3
 
 MODEL_PATH=Qwen/Qwen2.5-7B-Instruct
@@ -14,7 +13,6 @@ export VLLM_ATTENTION_BACKEND=XFORMERS
 
 timestamp=$(date +"%Y-%m-%d_%H-%M-%S")
 
-# Run the PPO training with memory-optimized settings
 python3 -m verl.trainer.main_ppo \
     algorithm.adv_estimator=reinforce_plus_plus \
     data.train_files=data/reason_io/reason_io_dataset_train.parquet \
