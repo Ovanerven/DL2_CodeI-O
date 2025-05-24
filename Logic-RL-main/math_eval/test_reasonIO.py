@@ -136,6 +136,11 @@ def check_answer_correctness(model_answer, expected_solution):
     norm_expected = normalize_literal(expected_value)
     norm_model = normalize_literal(model_value)
     
+    # If both are strings, also try comparing with stripped whitespace
+    if isinstance(norm_expected, str) and isinstance(norm_model, str):
+        norm_expected = norm_expected.rstrip()
+        norm_model    = norm_model.rstrip()
+
     return norm_expected == norm_model
 
 def create_difficulty_bins(ref_code_lengths):
