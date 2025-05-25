@@ -16,4 +16,4 @@ module load CUDA/12.4.0
 
 source activate qwen-eval
 
-srun python evaluate_benchmarks.py --model_path "/gpfs/home6/scur2665/DL2_CodeI-O/Logic-RL-main/actor_checkpoints/reason_io_2025-05-21_13-07-34/actor/global_step_1250" --benchmark winogrande
+srun python evaluate_benchmarks.py --model_path "Qwen/Qwen2.5-3B-Instruct" --benchmark winogrande
