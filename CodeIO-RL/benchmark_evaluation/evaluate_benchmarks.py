@@ -34,7 +34,8 @@ def build_messages(benchmark, sample):
         return [
             {"role": "system", "content": (
                 "You are a helpful assistant. Think step-by-step inside the <think> </think> tags. "
-                "Then provide your final choice word-for-word inside the <answer> </answer> tags."
+                "Then provide your final choice word-for-word inside the <answer> </answer> tags. "
+                "The <answer> tag should contain only the answer, like <answer>Sarah</answer>."
             )},
             {"role": "user", "content": (
                 f"Choose the correct option to complete the sentence: {sample['sentence']}\n"
@@ -79,9 +80,9 @@ def extract_winogrande_answer(response, option1, option2):
         return ""
     answer = match.group(1).strip().lower()
     answer = re.sub(r"option\s*\d:\s*", "", answer).strip()
-    if answer == option1.lower():
+    if answer.lower() == option1.lower():
         return "1"
-    elif answer == option2.lower():
+    elif answer.lower() == option2.lower():
         return "2"
     return ""
 
@@ -192,7 +193,8 @@ def main():
     print(f"Average time taken: {total_time / len(data):.4f} seconds")
     print(f"Total time taken: {total_time:.4f} seconds")
 
-    with open(f"benchmark_logs/{args.benchmark}_log.json", "w") as f:
+    model = args.model_path.split("/")[-1]
+    with open(f"benchmark_logs/{model}_{args.benchmark}_log.json", "w") as f:
         json.dump(logs, f, indent=2)
 
 if __name__ == "__main__":
