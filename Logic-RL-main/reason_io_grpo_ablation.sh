@@ -34,9 +34,9 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.actor.fsdp_config.grad_offload=True \
     actor_rollout_ref.actor.fsdp_config.optimizer_offload=True \
     actor_rollout_ref.rollout.log_prob_micro_batch_size=160 \
-    actor_rollout_ref.rollout.tensor_model_parallel_size=4 \
+    actor_rollout_ref.rollout.tensor_model_parallel_size=1 \
     actor_rollout_ref.rollout.name=vllm \
-    actor_rollout_ref.rollout.gpu_memory_utilization=0.4 \
+    actor_rollout_ref.rollout.gpu_memory_utilization=0.8 \
     actor_rollout_ref.rollout.n=8 \
     actor_rollout_ref.rollout.temperature=0.7 \
     actor_rollout_ref.ref.log_prob_micro_batch_size=160 \
@@ -45,11 +45,11 @@ python3 -m verl.trainer.main_ppo \
     trainer.critic_warmup=0 \
     trainer.logger=['wandb'] \
     trainer.project_name='ReasonIO' \
-    trainer.experiment_name="Qwen-7B-OG_ReasonIO_${timestamp}" \
-    trainer.n_gpus_per_node=4 \
+    trainer.experiment_name="Qwen-3B_ReasonIO_${timestamp}" \
+    trainer.n_gpus_per_node=2 \
     trainer.nnodes=1 \
     trainer.default_local_dir=actor_checkpoints/reason_io_${timestamp} \
     trainer.default_hdfs_dir=null \
-    trainer.save_freq=420 \
+    trainer.save_freq=1250 \
     trainer.test_freq=10 \
-    trainer.total_epochs=1 $@ 2>&1 | tee logs/reasonio/reason_io_${timestamp}.log
+    trainer.total_epochs=5 $@ 2>&1 | tee logs/reasonio/reason_io_${timestamp}.log
