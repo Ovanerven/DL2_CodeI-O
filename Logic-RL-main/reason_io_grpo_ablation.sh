@@ -8,7 +8,7 @@ export TORCH_CUDA_ALLOW_TF32=1
 export HYDRA_FULL_ERROR=1
 export CUDA_VISIBLE_DEVICES=0,1
 
-MODEL_PATH=Qwen/Qwen2.5-7B-Instruct
+MODEL_PATH=Qwen/Qwen2.5-3B-Instruct
 export VLLM_ATTENTION_BACKEND=XFORMERS
 
 timestamp=$(date +"%Y-%m-%d_%H-%M-%S")
