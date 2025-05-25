@@ -34,23 +34,27 @@ def build_messages(benchmark, sample):
         return [
             {"role": "system", "content": (
                 "You are a helpful assistant. Think step-by-step inside the <think> </think> tags. "
-                "Then provide your final choice word-for-word inside the <answer> </answer> tags. "
-                "The <answer> tag should contain only the answer, like <answer>Sarah</answer>."
+                "Then provide your final choice as either '1' or '2' inside the <answer> </answer> tags. "
+                "The <answer> tag should contain only the number, like <answer>1</answer> or <answer>2</answer>."
             )},
             {"role": "user", "content": (
-                f"Choose the correct option to complete the sentence: {sample['sentence']}\n"
-                f"Option 1: {sample['option1']}\nOption 2: {sample['option2']}"
+                f"Choose the correct option to complete the sentence:\n\n"
+                f"{sample['sentence']}\n\n"
+                f"1. {sample['option1']}\n"
+                f"2. {sample['option2']}\n\n"
+                f"Answer with 1 (for option 1) or 2 (for option 2):"
             )}
         ]
+
     
-    elif benchmark == "humaneval":
-        return [
-            {"role": "system", "content": (
-                "You are a helpful coding assistant. Think through the solution inside the <think> </think> tags, "
-                "and place the full function code inside the <answer> </answer> tags. Do not include explanations outside the tags."
-            )},
-            {"role": "user", "content": f"Complete the following Python function:\n\n{sample['prompt']}"}
-        ]
+    # elif benchmark == "humaneval":
+    #     return [
+    #         {"role": "system", "content": (
+    #             "You are a helpful coding assistant. Think through the solution inside the <think> </think> tags, "
+    #             "and place the full function code inside the <answer> </answer> tags. Do not include explanations outside the tags."
+    #         )},
+    #         {"role": "user", "content": f"Complete the following Python function:\n\n{sample['prompt']}"}
+    #     ]
     
     else:
         raise ValueError("Unsupported benchmark")
@@ -74,17 +78,19 @@ def extract_gsm8k_answer(response):
     return ""
 
 
-def extract_winogrande_answer(response, option1, option2):
-    match = re.search(r"<answer>\s*(.*?)\s*</answer>", response, re.IGNORECASE | re.DOTALL)
-    if not match:
-        return ""
-    answer = match.group(1).strip().lower()
-    answer = re.sub(r"option\s*\d:\s*", "", answer).strip()
-    if answer.lower() == option1.lower():
-        return "1"
-    elif answer.lower() == option2.lower():
-        return "2"
+def extract_winogrande_answer(response):
+    """Extract 1 or 2 from <answer> tags"""
+    match = re.search(r"<answer>\s*([12])\s*</answer>", response, re.IGNORECASE)
+    if match:
+        return match.group(1)
+    
+    # Fallback: look for just 1 or 2 in the response
+    match = re.search(r"<answer>\s*.?([12]).?\s*</answer>", response, re.IGNORECASE)
+    if match:
+        return match.group(1)
+    
     return ""
+
 
 
 def extract_humaneval_answer(response):
@@ -145,11 +151,10 @@ def main():
             correct = prediction == expected_clean
 
         elif args.benchmark == "winogrande":
-            option1 = sample["option1"]
-            option2 = sample["option2"]
-            prediction = extract_winogrande_answer(response, option1, option2)
+            prediction = extract_winogrande_answer(response)
             expected_clean = str(expected_answer).strip()
             correct = prediction == expected_clean
+
 
         elif args.benchmark == "humaneval":
             # For humaneval, we assume the response is a Python function
