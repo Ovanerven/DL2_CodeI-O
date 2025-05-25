@@ -30,22 +30,51 @@ def build_messages(benchmark, sample):
             {"role": "user", "content": f"Answer the following math question step by step:\n{sample['question']}"}
         ]
 
-    elif benchmark == "winogrande":
-        return [
-            {"role": "system", "content": (
-                "You are a helpful assistant. Think step-by-step inside the <think> </think> tags. "
-                "Then provide your final choice as either '1' or '2' inside the <answer> </answer> tags. "
-                "The <answer> tag should contain only the number, like <answer>1</answer> or <answer>2</answer>."
-            )},
-            {"role": "user", "content": (
-                f"Choose the correct option to complete the sentence:\n\n"
-                f"{sample['sentence']}\n\n"
-                f"1. {sample['option1']}\n"
-                f"2. {sample['option2']}\n\n"
-                f"Answer with 1 (for option 1) or 2 (for option 2):"
-            )}
-        ]
+    # elif benchmark == "winogrande":
+    #     return [
+    #         {"role": "system", "content": (
+    #             "You are a helpful assistant. Think step-by-step inside the <think> </think> tags. "
+    #             "Then provide your final choice as either '1' or '2' inside the <answer> </answer> tags. "
+    #             "The <answer> tag should contain only the number, like <answer>1</answer> or <answer>2</answer>."
+    #         )},
+    #         {"role": "user", "content": (
+    #             f"Choose the correct option to complete the sentence:\n\n"
+    #             f"{sample['sentence']}\n\n"
+    #             f"1. {sample['option1']}\n"
+    #             f"2. {sample['option2']}\n\n"
+    #             f"Answer with 1 (for option 1) or 2 (for option 2):"
+    #         )}
+    #     ]
 
+    elif benchmark == "winogrande":
+        system_content = (
+            "You are a helpful assistant. The assistant first thinks about the reasoning process "
+            "in the mind and then provides the user with the answer. The reasoning process and answer "
+            "are enclosed within <think> </think> and <answer> </answer> tags, respectively, "
+            "i.e., <think> reasoning process here </think><answer> answer here </answer>. "
+            "Now the user asks you to solve a logical reasoning problem. After thinking, when you "
+            "finally reach a conclusion, clearly state your choice as either 1 or 2 within "
+            "<answer> </answer> tags. i.e., <answer>1</answer> or <answer>2</answer>."
+        )
+        
+        user_content = (
+            f"You are given a sentence completion task. Choose the correct option that best "
+            f"completes the sentence.\n\n"
+            f"Sentence: {sample['sentence']}\n\n"
+            f"Options:\n"
+            f"Option 1. {sample['option1']}\n"
+            f"Option 2. {sample['option2']}\n\n"
+            f"So which option correctly completes the sentence? Think, and then answer with <answer>1</answer> (for option 1) or <answer>2</answer> (for option 2):"
+        )
+        
+        # Match exact training format with <think> priming
+        combined_content = (
+            f"<|im_start|>system\n{system_content}\n<|im_end|>\n"
+            f"<|im_start|>user\n{user_content}\n<|im_end|>\n"
+            f"<|im_start|>assistant\n<think>"
+        )
+        
+        return [{"role": "user", "content": combined_content}]
     
     # elif benchmark == "humaneval":
     #     return [
@@ -90,7 +119,6 @@ def extract_winogrande_answer(response):
         return match.group(1)
     
     return ""
-
 
 
 def extract_humaneval_answer(response):
