@@ -1,0 +1,14 @@
+{
+  "model": "reason_io_2025-05-21_13-07-34",
+  "benchmark": "gsm8k",
+  "num_runs": 3,
+  "individual_accuracies": [
+    0.5496588324488249,
+    0.5905989385898408,
+    0.5291887793783169
+  ],
+  "mean_accuracy": 0.5564821834723275,
+  "std_accuracy": 0.025530641759640257,
+  "min_accuracy": 0.5291887793783169,
+  "max_accuracy": 0.5905989385898408
+}
