@@ -1,0 +1,14 @@
+{
+  "model": "checkpoint_2025-05-20_15-14-12",
+  "benchmark": "gsm8k",
+  "num_runs": 3,
+  "individual_accuracies": [
+    0.48597422289613346,
+    0.378316906747536,
+    0.41243366186504926
+  ],
+  "mean_accuracy": 0.42557493050290623,
+  "std_accuracy": 0.044922482390142605,
+  "min_accuracy": 0.378316906747536,
+  "max_accuracy": 0.48597422289613346
+}

@@ -1,5 +1,6 @@
 import argparse
 import json
+import os
 import re
 import time
 from tqdm import tqdm
@@ -136,6 +137,7 @@ def main():
     parser.add_argument("--model_path", type=str, required=True, help="Path to the model")
     parser.add_argument("--benchmark", type=str, required=True, choices=["gsm8k", "winogrande", "humaneval"],
                         help="Benchmark to evaluate")
+    parser.add_argument("--num_runs", type=int, default=3, help="Number of runs with different seeds")
     args = parser.parse_args()
     
     llm = LLM(
@@ -147,88 +149,132 @@ def main():
         max_model_len=20000
     )
 
-    sampling_params = SamplingParams(
-        max_tokens=10000,
-        temperature=0.8,
-        top_p=0.95
-    )
-
     data = load_benchmark(args.benchmark)
     tokenizer = llm.get_tokenizer()
-
-    correct_cnt = 0
-    curr = 0
-    total_time = 0
-    logs = []
-
-    for sample in tqdm(data):
-        messages = build_messages(args.benchmark, sample)
-        text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-        expected_answer = get_answer(args.benchmark, sample)
-        
-        start = time.time()
-        output = llm.generate([text], sampling_params=sampling_params)
-        time_taken = time.time() - start
-        response = output[0].outputs[0].text.strip()
-
-        # benchmark specific extraction logic
-        if args.benchmark == "gsm8k":
-            prediction = extract_gsm8k_answer(response)
-            match = re.search(r"####\s*(\d+)", str(expected_answer))
-            expected_clean = match.group(1) if match else ""
-            correct = prediction == expected_clean
-
-        elif args.benchmark == "winogrande":
-            prediction = extract_winogrande_answer(response)
-            expected_clean = str(expected_answer).strip()
-            correct = prediction == expected_clean
-
-
-        elif args.benchmark == "humaneval":
-            # For humaneval, we assume the response is a Python function
-            # and we will execute it to check if it matches the expected answer
-            expected_clean = str(expected_answer).strip()
-            predicted_code = extract_humaneval_answer(response)
-
-            try:
-                compile(predicted_code, "<string>", "exec")
-                correct = function_defined(predicted_code, expected_clean)
-            except SyntaxError as e:
-                print(f"Error executing generated code: {e}")
-                correct = False
-
-            prediction = predicted_code
-        
-        else:
-            correct = False
-            prediction = ""
-
-        logs.append({
-            "prompt": messages[-1]["content"],
-            "expected_answer": expected_answer,
-            "expected_clean": expected_clean,
-            "response": response,
-            "predicted_answer": prediction,
-            "correct": correct
-        })
-
-        curr += 1
-        if correct:
-            correct_cnt += 1
-
-        if curr % 100 == 0:
-            print(f"Accuracy after {curr} samples: {correct_cnt / curr:.4f}")
-
-        total_time += time_taken
     
-    accuracy = correct_cnt / len(data)
-    print(f"{args.benchmark} accuracy: {accuracy:.4f}")
-    print(f"Average time taken: {total_time / len(data):.4f} seconds")
-    print(f"Total time taken: {total_time:.4f} seconds")
+    # Store results across all runs
+    all_accuracies = []
+    all_logs = []
+    
+    for run_idx in range(args.num_runs):
+        print(f"\n=== Run {run_idx + 1}/{args.num_runs} ===")
+        
+        # Different seed for each run
+        seed = 42 + run_idx
+        sampling_params = SamplingParams(
+            max_tokens=10000,
+            temperature=0.8,
+            top_p=0.95,
+            seed=seed
+        )
 
-    model = args.model_path.split("/")[-1]
-    with open(f"benchmark_logs/{model}_{args.benchmark}_log.json", "w") as f:
-        json.dump(logs, f, indent=2)
+        correct_cnt = 0
+        curr = 0
+        total_time = 0
+        logs = []
+
+        for sample in tqdm(data, desc=f"Run {run_idx + 1}"):
+            messages = build_messages(args.benchmark, sample)
+            text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+            expected_answer = get_answer(args.benchmark, sample)
+            
+            start = time.time()
+            output = llm.generate([text], sampling_params=sampling_params)
+            time_taken = time.time() - start
+            response = output[0].outputs[0].text.strip()
+
+            # benchmark specific extraction logic
+            if args.benchmark == "gsm8k":
+                prediction = extract_gsm8k_answer(response)
+                match = re.search(r"####\s*(\d+)", str(expected_answer))
+                expected_clean = match.group(1) if match else ""
+                correct = prediction == expected_clean
+
+            elif args.benchmark == "winogrande":
+                prediction = extract_winogrande_answer(response)
+                expected_clean = str(expected_answer).strip()
+                correct = prediction == expected_clean
+
+            elif args.benchmark == "humaneval":
+                # For humaneval, we assume the response is a Python function
+                # and we will execute it to check if it matches the expected answer
+                expected_clean = str(expected_answer).strip()
+                predicted_code = extract_humaneval_answer(response)
+
+                try:
+                    compile(predicted_code, "<string>", "exec")
+                    correct = function_defined(predicted_code, expected_clean)
+                except SyntaxError as e:
+                    print(f"Error executing generated code: {e}")
+                    correct = False
+
+                prediction = predicted_code
+            
+            else:
+                correct = False
+                prediction = ""
+
+            logs.append({
+                "run": run_idx + 1,
+                "seed": seed,
+                "prompt": messages[-1]["content"],
+                "expected_answer": expected_answer,
+                "expected_clean": expected_clean,
+                "response": response,
+                "predicted_answer": prediction,
+                "correct": correct
+            })
+
+            curr += 1
+            if correct:
+                correct_cnt += 1
+
+            if curr % 100 == 0:
+                print(f"Run {run_idx + 1} - Accuracy after {curr} samples: {correct_cnt / curr:.4f}")
+
+            total_time += time_taken
+        
+        accuracy = correct_cnt / len(data)
+        all_accuracies.append(accuracy)
+        all_logs.extend(logs)
+        
+        print(f"Run {run_idx + 1} - {args.benchmark} accuracy: {accuracy:.4f}")
+        print(f"Run {run_idx + 1} - Average time taken: {total_time / len(data):.4f} seconds")
+        print(f"Run {run_idx + 1} - Total time taken: {total_time:.4f} seconds")
+    
+    # Calculate and report final statistics
+    mean_accuracy = sum(all_accuracies) / len(all_accuracies)
+    std_accuracy = (sum((acc - mean_accuracy) ** 2 for acc in all_accuracies) / len(all_accuracies)) ** 0.5
+    
+    print(f"\n=== Final Results ===")
+    print(f"{args.benchmark} - Individual accuracies: {[f'{acc:.4f}' for acc in all_accuracies]}")
+    print(f"{args.benchmark} - Mean accuracy: {mean_accuracy:.4f} ± {std_accuracy:.4f}")
+    print(f"{args.benchmark} - Min accuracy: {min(all_accuracies):.4f}")
+    print(f"{args.benchmark} - Max accuracy: {max(all_accuracies):.4f}")
+
+    model = args.model_path.split("/")[-3]
+    
+    # Create benchmark_logs directory if it doesn't exist
+    os.makedirs("benchmark_logs", exist_ok=True)
+    
+    # Save individual run logs
+    with open(f"benchmark_logs/{model}_{args.benchmark}_all_runs_log.json", "w") as f:
+        json.dump(all_logs, f, indent=2)
+    
+    # Save summary statistics
+    summary = {
+        "model": model,
+        "benchmark": args.benchmark,
+        "num_runs": args.num_runs,
+        "individual_accuracies": all_accuracies,
+        "mean_accuracy": mean_accuracy,
+        "std_accuracy": std_accuracy,
+        "min_accuracy": min(all_accuracies),
+        "max_accuracy": max(all_accuracies)
+    }
+    
+    with open(f"benchmark_logs/{model}_{args.benchmark}_summary.json", "w") as f:
+        json.dump(summary, f, indent=2)
 
 if __name__ == "__main__":
     main()

@@ -1,0 +1,14 @@
+{
+  "model": "reason_io_2025-05-21_13-07-34",
+  "benchmark": "winogrande",
+  "num_runs": 3,
+  "individual_accuracies": [
+    0.5982636148382005,
+    0.5974743488555643,
+    0.6132596685082873
+  ],
+  "mean_accuracy": 0.6029992107340173,
+  "std_accuracy": 0.0072623908139133305,
+  "min_accuracy": 0.5974743488555643,
+  "max_accuracy": 0.6132596685082873
+}

@@ -1,0 +1,14 @@
+{
+  "model": "checkpoint_2025-05-20_15-14-12",
+  "benchmark": "winogrande",
+  "num_runs": 3,
+  "individual_accuracies": [
+    0.4846093133385951,
+    0.4877663772691397,
+    0.46566692975532753
+  ],
+  "mean_accuracy": 0.47934754012102077,
+  "std_accuracy": 0.009759135485920233,
+  "min_accuracy": 0.46566692975532753,
+  "max_accuracy": 0.4877663772691397
+}
