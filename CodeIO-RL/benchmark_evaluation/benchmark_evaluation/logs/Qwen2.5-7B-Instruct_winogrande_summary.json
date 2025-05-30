@@ -1,0 +1,19 @@
+{
+  "model": "Qwen2.5-7B-Instruct",
+  "model_path": "Qwen/Qwen2.5-7B-Instruct",
+  "benchmark": "winogrande",
+  "num_runs": 5,
+  "num_samples": 1267,
+  "individual_accuracies": [
+    0.6921862667719021,
+    0.7071823204419889,
+    0.696921862667719,
+    0.7016574585635359,
+    0.6898184688239937
+  ],
+  "mean_accuracy": 0.697553275453828,
+  "std_accuracy": 0.006302277751437136,
+  "min_accuracy": 0.6898184688239937,
+  "max_accuracy": 0.7071823204419889,
+  "used_vllm": false
+}

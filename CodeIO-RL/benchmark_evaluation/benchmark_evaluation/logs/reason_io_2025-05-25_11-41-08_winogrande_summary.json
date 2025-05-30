@@ -1,0 +1,19 @@
+{
+  "model": "reason_io_2025-05-25_11-41-08",
+  "model_path": "/home/overven1/DL2_CodeI-O/Logic-RL-main/actor_checkpoints/reason_io_2025-05-25_11-41-08/actor/global_step_1000",
+  "benchmark": "winogrande",
+  "num_runs": 5,
+  "num_samples": 1267,
+  "individual_accuracies": [
+    0.6929755327545383,
+    0.6977111286503551,
+    0.6945540647198106,
+    0.6827150749802684,
+    0.6858721389108129
+  ],
+  "mean_accuracy": 0.690765588003157,
+  "std_accuracy": 0.005589875677861322,
+  "min_accuracy": 0.6827150749802684,
+  "max_accuracy": 0.6977111286503551,
+  "used_vllm": true
+}

@@ -1,0 +1,19 @@
+{
+  "model": "Qwen2.5-7B-Instruct",
+  "model_path": "Qwen/Qwen2.5-7B-Instruct",
+  "benchmark": "gsm8k",
+  "num_runs": 5,
+  "num_samples": 1319,
+  "individual_accuracies": [
+    0.8574677786201668,
+    0.8483699772554966,
+    0.8582259287338894,
+    0.8582259287338894,
+    0.8589840788476119
+  ],
+  "mean_accuracy": 0.8562547384382106,
+  "std_accuracy": 0.003971433162610726,
+  "min_accuracy": 0.8483699772554966,
+  "max_accuracy": 0.8589840788476119,
+  "used_vllm": false
+}

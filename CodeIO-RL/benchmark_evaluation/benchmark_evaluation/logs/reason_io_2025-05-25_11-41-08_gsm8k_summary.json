@@ -1,0 +1,19 @@
+{
+  "model": "reason_io_2025-05-25_11-41-08",
+  "model_path": "/home/overven1/DL2_CodeI-O/Logic-RL-main/actor_checkpoints/reason_io_2025-05-25_11-41-08/actor/global_step_1000",
+  "benchmark": "gsm8k",
+  "num_runs": 5,
+  "num_samples": 1319,
+  "individual_accuracies": [
+    0.8824867323730099,
+    0.866565579984837,
+    0.8764215314632298,
+    0.8309325246398787,
+    0.8673237300985596
+  ],
+  "mean_accuracy": 0.8647460197119029,
+  "std_accuracy": 0.01791289088779061,
+  "min_accuracy": 0.8309325246398787,
+  "max_accuracy": 0.8824867323730099,
+  "used_vllm": true
+}

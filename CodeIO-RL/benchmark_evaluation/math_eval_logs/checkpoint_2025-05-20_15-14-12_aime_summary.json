@@ -1,0 +1,19 @@
+{
+  "model": "checkpoint_2025-05-20_15-14-12",
+  "model_path": "/home/overven1/DL2_CodeI-O/Logic-RL-main/actor_checkpoints/checkpoint_2025-05-20_15-14-12/actor/global_step_1250",
+  "benchmark": "aime",
+  "num_runs": 5,
+  "num_samples": 103,
+  "individual_accuracies": [
+    0.0,
+    0.019417475728155338,
+    0.019417475728155338,
+    0.009708737864077669,
+    0.009708737864077669
+  ],
+  "mean_accuracy": 0.0116504854368932,
+  "std_accuracy": 0.007265354149075615,
+  "min_accuracy": 0.0,
+  "max_accuracy": 0.019417475728155338,
+  "used_vllm": true
+}
